@@ -60,3 +60,8 @@ Design-alternatives CMS demo: `/NaViGate_Design_Alternatives/cms.html` (pick any
 
 Only outbound links (WhatsApp/Twitter share, ADG office websites). No external scripts, fonts or APIs are loaded,
 so staging does not need outbound internet access.
+
+## Home page
+
+`index.html` is the finalised Concept C (light) design. The original portal home page is kept as `index-classic.html`.
+Concepts A, B and C are also available side by side at `/NaViGate_Design_Alternatives/viewer.html`.

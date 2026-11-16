@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NaViGate Bharat 2.0 - National Video Gateway (demo)</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.hero{background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 70%,#1b4a7d 100%);color:#fff;border-radius:0 0 22px 22px;padding:44px 0 38px;margin-bottom:8px}
+body.hc .hero{border-bottom:2px solid #fff}
+.hero h1{font-size:2.3rem;margin:0 0 8px;color:#fff}
+.hero p.lead{margin:0 0 20px;color:#dbe6f3;font-size:1.08rem;max-width:720px}
+body.hc .hero p.lead{color:#fff}
+.bigsearch{display:flex;gap:0;max-width:760px;background:var(--card);border-radius:999px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.28);border:2px solid transparent}
+.bigsearch:focus-within{border-color:var(--saffron)}
+.bigsearch input{flex:1;border:0;padding:15px 22px;font-size:1.1rem;background:transparent;color:var(--ink);min-width:0;border-radius:0}
+.bigsearch input:focus{outline:none}
+.bigsearch button{border:0;cursor:pointer;font-size:1.05rem;padding:0 20px}
+.bigsearch .mic{background:var(--soft);color:var(--ink);font-size:1.3rem}
+.bigsearch .go{background:var(--saffron);color:#0B1F3A;font-weight:700}
+.chips-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;align-items:center}
+.chips-row .lbl{font-size:.82rem;color:#cbd9ea;font-weight:700;margin-right:4px}
+body.hc .chips-row .lbl{color:#fff}
+.qchip{display:inline-block;padding:6px 14px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4);color:#fff;text-decoration:none;font-size:.88rem;font-weight:600}
+.qchip:hover{background:var(--saffron);color:#0B1F3A;border-color:var(--saffron)}
+.vcard.spot{outline:3px solid var(--saffron);outline-offset:2px;transform:translateY(-3px)}
+.tile{display:block;text-decoration:none;color:inherit;transition:transform .15s,box-shadow .15s;text-align:center}
+.tile:hover{transform:translateY(-3px);box-shadow:0 6px 18px rgba(11,31,58,.16)}
+.tile .ic{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;font-size:1.7rem;margin:0 auto 8px;color:#fff}
+.tile h3{font-size:1.02rem;margin:0}
+.tile .hi{font-size:.82rem;color:var(--muted)}
+.tile .cnt{margin-top:6px;font-size:.8rem;font-weight:700;color:var(--blue)}
+body.hc .tile .ic{border:2px solid #fff}
+.band{background:var(--navy);border-radius:var(--radius);padding:20px;margin-top:34px}
+.band .stat{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.2);box-shadow:none}
+.band .stat b{color:#fff}.band .stat span{color:#cbd9ea}
+body.hc .band .stat b{color:#ffe600}
+.teaser{display:flex;gap:16px;align-items:flex-start}
+.teaser .big{font-size:2.4rem;line-height:1}
+.teaser h3{font-size:1.25rem}
+.teaser .nums{display:flex;gap:18px;margin:10px 0 14px;font-size:.85rem;color:var(--muted)}
+.teaser .nums b{display:block;font-size:1.4rem;color:var(--navy2);font-family:Cambria,Georgia,serif}
+body.hc .teaser .nums b{color:#ffe600}
+.comp{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:30px;padding:14px 18px;border-radius:var(--radius);background:#DFF3EC;border:1px solid #b7e2d4;color:#0f5f4c}
+body.hc .comp{background:#000;color:#fff;border-color:#fff}
+.comp strong{margin-right:6px}
+.comp span.ok{font-weight:700;font-size:.85rem;background:#fff;border-radius:999px;padding:3px 11px;border:1px solid #b7e2d4;color:#0f5f4c}
+body.hc .comp span.ok{background:#000;color:#fff;border-color:#fff}
+@media(max-width:600px){.hero h1{font-size:1.65rem}.bigsearch input{padding:12px 14px;font-size:1rem}.bigsearch button{padding:0 13px}.teaser{flex-direction:column}}
+@media(prefers-reduced-motion:reduce){.vcard,.tile{transition:none}}
+</style>
+</head>
+<body>
+<main class="wrap" id="main" style="max-width:none;padding:0">
+<section class="hero" aria-labelledby="h1">
+  <div class="wrap">
+    <h1 id="h1">Watch, learn and share India's stories</h1>
+    <p class="lead">Explainers, schemes, culture and community voices from the National Video Gateway, in six languages, free for everyone.</p>
+    <form class="bigsearch" id="heroSearch" action="search.html" role="search">
+      <label for="heroQ" class="sr" style="position:absolute;left:-9999px">Search videos, topics, schemes</label>
+      <input id="heroQ" name="q" type="search" placeholder="Search videos, topics, schemes" autocomplete="off">
+      <button type="button" class="mic" id="heroMic" aria-label="Voice search" title="Voice search">🎤</button>
+      <button type="submit" class="go">Search</button>
+    </form>
+    <div class="chips-row" id="quickChips"><span class="lbl">Popular topics:</span></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="sec-title"><h2 id="featH">Featured videos</h2><div><button type="button" class="btn sec sm" id="rotBtn" aria-pressed="false">Pause highlight</button> <a class="btn sec sm" href="search.html">View all</a></div></div>
+  <div class="grid g4" id="featured" aria-labelledby="featH"></div>
+
+  <div class="sec-title"><h2>Browse by category</h2><a class="btn sec sm" href="categories.html">All categories</a></div>
+  <div class="grid g4" id="cats"></div>
+
+  <div class="sec-title"><h2>Latest videos</h2><a class="btn sec sm" href="search.html?sort=latest">View all</a></div>
+  <div class="grid g4" id="latest"></div>
+
+  <section class="band" aria-label="Portal statistics">
+    <div class="grid g4">
+      <div class="stat"><b id="sHits" data-count="0">0</b><span>Total portal visits</span></div>
+      <div class="stat"><b data-count="0" id="sVid">0</b><span>Videos available</span></div>
+      <div class="stat"><b data-count="0" id="sLang">0</b><span>Languages</span></div>
+      <div class="stat"><b data-count="0" id="sCat">0</b><span>Categories</span></div>
+    </div>
+  </section>
+
+  <div class="sec-title"><h2>Community Radio and Public Service Announcements</h2></div>
+  <div class="grid g2">
+    <div class="card teaser"><div class="big" aria-hidden="true">📻</div><div>
+      <h3>Community Radio</h3><p class="muted" style="margin:0">Listen to local voices from community radio stations across states: farming tips, health diaries, folk music and more.</p>
+      <div class="nums"><div><b id="tSt">0</b>Stations</div><div><b id="tEp">0</b>Featured episodes</div></div>
+      <a class="btn" href="crs.html">Explore Community Radio</a></div></div>
+    <div class="card teaser"><div class="big" aria-hidden="true">📢</div><div>
+      <h3>Public Service Announcements</h3><p class="muted" style="margin:0">Short, trusted messages on road safety, health, cyber safety and more, ready to view and share.</p>
+      <div class="nums"><div><b id="tPs">0</b>Active PSAs</div><div><b id="tTp">0</b>Topics</div></div>
+      <a class="btn warn" href="psa.html">View PSAs</a></div></div>
+  </div>
+
+  <div class="comp" role="note" aria-label="Accessibility and compliance">
+    <strong>♿ Accessible by design</strong>
+    <span class="ok">GIGW 3.0 aligned</span><span class="ok">WCAG 2.1 AA</span><span class="ok">Keyboard navigable</span><span class="ok">Text resize and high contrast</span><span class="ok">Bilingual (English / हिन्दी)</span>
+  </div>
+</div>
+</main>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+ADG.page({nav:"home"});
+(function(){
+  const D=ADG.D, $=ADG.$, esc=ADG.esc;
+  const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* quick category chips */
+  const qc=$("#quickChips");
+  D.cats.slice(0,6).forEach(c=>{ const a=document.createElement("a"); a.className="qchip"; a.href="search.html?cat="+encodeURIComponent(c.id); a.textContent=c.icon+" "+c.name; qc.appendChild(a); });
+
+  /* voice (hero) */
+  function listen(input,form){
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const submit=()=>{ form.requestSubmit?form.requestSubmit():form.submit(); };
+    let fell=false;
+    const demo=why=>{ if(fell) return; fell=true; ADG.toast((why||"Listening...")+" (demo: heard 'digital literacy')"); setTimeout(()=>{ input.value="digital literacy"; submit(); },1100); };
+    if(SR){ try{ const r=new SR(); r.lang=ADG.lang()==="hi"?"hi-IN":"en-IN"; r.onresult=e=>{ fell=true; input.value=e.results[0][0].transcript; submit(); }; r.onerror=()=>demo("Microphone unavailable."); r.onend=()=>{ if(!fell) setTimeout(()=>demo("No speech detected."),50); }; let st=false; r.onstart=()=>{ st=true; }; r.start(); ADG.toast("Listening..."); setTimeout(()=>{ if(!st&&!fell){ try{ r.abort(); }catch(_){} demo("Microphone unavailable."); } },8000); }catch(e){ demo(); } }
+    else demo();
+  }
+  $("#heroMic").onclick=()=>listen($("#heroQ"),$("#heroSearch"));
+
+  /* featured strip */
+  const feat=$("#featured"); feat.innerHTML=D.videos.slice(0,4).map(v=>ADG.vcard(v)).join("");
+  const fc=[...feat.children]; let idx=0, paused=false, timer=null;
+  function spot(){ fc.forEach((c,i)=>c.classList.toggle("spot",i===idx)); }
+  function tick(){ idx=(idx+1)%fc.length; spot(); }
+  function start(){ stop(); if(!reduce && !paused) timer=setInterval(tick,3200); }
+  function stop(){ if(timer){ clearInterval(timer); timer=null; } }
+  spot(); start();
+  feat.addEventListener("mouseenter",stop); feat.addEventListener("mouseleave",start);
+  feat.addEventListener("focusin",stop); feat.addEventListener("focusout",start);
+  $("#rotBtn").onclick=function(){ paused=!paused; this.setAttribute("aria-pressed",paused); this.textContent=paused?"Resume highlight":"Pause highlight"; paused?stop():start(); };
+  if(reduce){ $("#rotBtn").style.display="none"; }
+
+  /* categories */
+  $("#cats").innerHTML=D.cats.map(c=>{ const n=D.videos.filter(v=>v.cat===c.id).length;
+    return '<a class="card tile" href="search.html?cat='+encodeURIComponent(c.id)+'"><div class="ic" style="background:'+c.color+'" aria-hidden="true">'+c.icon+'</div><h3>'+esc(c.name)+'</h3><div class="hi" lang="hi">'+esc(c.hi)+'</div><div class="cnt">'+n+' videos</div></a>'; }).join("");
+
+  /* latest */
+  $("#latest").innerHTML=D.videos.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8).map(v=>ADG.vcard(v)).join("");
+
+  /* stats count-up */
+  function countUp(el,end){
+    const fmtN=n=>Math.round(n).toLocaleString("en-IN");
+    if(reduce){ el.textContent=fmtN(end); return; }
+    const t0=performance.now(), dur=1400;
+    (function step(t){ const p=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-p,3); el.textContent=fmtN(end*e); if(p<1) requestAnimationFrame(step); })(t0);
+  }
+  const targets=[["sHits",D.analytics.hitCounter],["sVid",D.videos.length],["sLang",D.langs.length],["sCat",D.cats.length]];
+  targets.forEach(t=>{ $("#"+t[0]).textContent=Math.round(t[1]).toLocaleString("en-IN"); });
+  let ran=false;
+  function runStats(){ if(ran) return; ran=true; targets.forEach(t=>countUp($("#"+t[0]),t[1])); }
+  if("IntersectionObserver" in window){ const io=new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)){ runStats(); io.disconnect(); } }); io.observe($(".band")); } else runStats();
+  /* safety: guarantee final values even if observer never fires (e.g. print/background tab) */
+  setTimeout(()=>{ if(!ran) runStats(); },6000);
+
+  /* teasers */
+  $("#tSt").textContent=D.stations.length; $("#tEp").textContent=D.episodes.length;
+  const act=D.psas.filter(p=>p.status==="Active"||p.status==="Expiring");
+  $("#tPs").textContent=act.length; $("#tTp").textContent=new Set(D.psas.map(p=>p.topic)).size;
+})();
+</script>
+</body>
+</html>
