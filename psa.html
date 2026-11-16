@@ -1,0 +1,143 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PSA Compliance · NaViGate Bharat 2.0</title><link rel="stylesheet" href="assets/css/style.css">
+<style>
+.roles{display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card);flex-wrap:wrap}
+.roles button{border:0;background:transparent;padding:9px 16px;font-weight:700;font-size:.9rem;cursor:pointer;color:var(--muted)}
+.roles button[aria-pressed=true]{background:var(--navy2);color:#fff}
+body.hc .roles button[aria-pressed=true]{background:#ffe600;color:#000}
+.roles button:focus-visible{outline-offset:-3px}
+.note{border-left:5px solid var(--saffron);background:var(--card);padding:12px 16px;border-radius:8px;border:1px solid var(--line);border-left:5px solid var(--saffron)}
+.tblwrap{overflow-x:auto}
+.acts{display:flex;gap:6px;flex-wrap:wrap}
+.muted-row td{color:var(--muted)}
+.big{font-family:Cambria,Georgia,serif;font-size:3rem;font-weight:700;line-height:1;color:var(--navy2)}
+body.hc .big{color:#ffe600}
+.alert{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid var(--line);border-left:5px solid var(--saffron);border-radius:8px;margin-bottom:8px;background:var(--card)}
+.alert.red{border-left-color:var(--red)} .alert.blue{border-left-color:var(--blue)}
+.err{color:var(--red);font-size:.8rem;font-weight:700;margin-top:3px}
+.toolbar{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:12px}
+.toolbar>div{min-width:170px}
+.dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.9rem;margin:12px 0}
+.dl dt{font-weight:700;color:var(--muted)} .dl dd{margin:0}
+[hidden]{display:none!important}
+</style></head><body><main class="wrap" id="main">
+<div class="sec-title"><div><h1 style="margin:0;font-size:1.9rem">Public Service Announcements: CBFC compliance</h1><div class="muted">PSA library, screening confirmation, compliance dashboards and alerts · sample data</div></div>
+<div><div class="muted" style="font-size:.78rem;font-weight:700;margin-bottom:4px" id="roleLbl">VIEW AS</div><div class="roles" role="group" aria-labelledby="roleLbl" id="roles"></div></div></div>
+<div class="note" id="roleNote" aria-live="polite"></div>
+<div class="note" id="winNote" style="margin-top:10px;border-left-color:var(--blue)"></div>
+
+<div class="grid g4" id="kpis" style="margin-top:18px"></div>
+
+<div class="sec-title"><h2>PSA library</h2><div class="muted">Expired items are archived automatically (valid-till before 15 Nov 2026)</div></div>
+<div class="card">
+ <div class="toolbar"><div><label for="lfS">Status</label><select id="lfS"><option value="">All statuses</option><option>Active</option><option>Expiring</option><option>Archived</option></select></div><div><label for="lfQ">Search</label><input type="search" id="lfQ" placeholder="Title or topic"></div><div class="muted" id="lfCnt" aria-live="polite" style="padding-bottom:10px"></div></div>
+ <div class="tblwrap"><table class="t" aria-label="PSA library"><thead><tr><th>ID</th><th>Title</th><th>Topic</th><th>Valid till</th><th>Status</th><th>Actions</th></tr></thead><tbody id="lib"></tbody></table></div>
+</div>
+
+<div class="sec-title"><h2>Exhibitor screening confirmation</h2><div class="muted">Digital confirmation · random 25% proof-of-screening check</div></div>
+<div class="card">
+ <div class="toolbar" data-roles="officer"><button class="btn warn" id="randSel">🎲 Run random proof selection (25%)</button><span class="muted" style="font-size:.85rem">The system picks 25% of confirmed screenings at random and requests proof.</span></div>
+ <div class="muted" style="font-size:.85rem;margin-bottom:8px" data-roles="exhibitor">Demo note: exhibitor actions are shown against every cinema so you can try the flow.</div>
+ <div class="tblwrap"><table class="t" aria-label="Exhibitors screening confirmation"><thead><tr><th>Exhibitor</th><th>Region</th><th>Screening</th><th>Score</th><th>Proof</th><th>Actions</th></tr></thead><tbody id="exh"></tbody></table></div>
+</div>
+
+<div class="sec-title"><h2>Compliance dashboard</h2></div>
+<div class="grid g3">
+ <div class="card"><h3 style="font-size:1.05rem">Overall compliance</h3><div class="big" id="overall">0%</div><div class="muted" style="font-size:.85rem;margin:6px 0 10px">Average screening score across all exhibitors</div><div class="bar" role="progressbar" aria-label="Overall compliance" id="overallBar" aria-valuemin="0" aria-valuemax="100"><i style="width:0"></i></div><div id="donut" style="margin-top:16px"></div></div>
+ <div class="card" style="grid-column:span 2"><h3 style="font-size:1.05rem">Compliance score by region</h3><div class="muted" style="font-size:.8rem">Average screening score (%) of exhibitors per region</div><div id="regions"></div></div>
+</div>
+
+<div class="sec-title"><h2>Alerts</h2><div><button class="btn sec sm" id="restore" hidden>Restore dismissed alerts</button></div></div>
+<div id="alerts" aria-live="polite"></div>
+</main>
+<script src="assets/js/data.js"></script><script src="assets/js/app.js"></script>
+<script>
+ADG.page({nav:"psa"});
+(function(){
+const {D,$,$$,store,toast,esc}=ADG, TODAY="2026-11-15", DAY=864e5;
+const ROLES=[["officer","CBFC officer"],["distributor","Distributor"],["exhibitor","Exhibitor"]];
+const NOTES={officer:"CBFC officer: full oversight. You can review the library, select random proof checks and monitor compliance.",distributor:"Distributor: you can preview PSAs and download distribution kits for active films. Exhibitor confirmations are read-only.",exhibitor:"Exhibitor: confirm that the mandatory PSA was screened and upload proof when the system requests it."};
+function mdl(html,fn){const bg=ADG.modal(html,fn);const k=e=>{if(!bg.isConnected){document.removeEventListener("keydown",k);return;}if(e.key==="Escape"){bg.remove();document.removeEventListener("keydown",k);}};document.addEventListener("keydown",k);const f=bg.querySelector("button,input,select,textarea");f&&f.focus();return bg;}
+let role=store.get("psa_role","officer");if(!ROLES.some(r=>r[0]===role))role="officer";
+const psas=()=>store.get("psa_list",null)||D.psas;
+const days=d=>Math.round((new Date(d)-new Date(TODAY))/DAY);
+function eff(p){if(p.status==="Archived"||p.validTill<TODAY)return"Archived";return days(p.validTill)<=30?"Expiring":"Active";}
+const SC={Active:"g",Expiring:"o",Archived:""};
+const win=()=>store.get("psa_window",{from:"2026-11-01",to:"2026-11-30"});
+function conf(){return store.get("psa_conf",{});}
+function exhibitors(){const c=conf();return D.exhibitors.map(e=>{const mine=c[e.id];const confirmed=e.status==="Confirmed"||!!mine;return Object.assign({},e,{confirmed,at:mine&&mine.at,score:Math.min(100,e.score+(mine&&e.status!=="Confirmed"?15:0))});});}
+let req=store.get("psa_proofreq",null);
+function pickReq(){const c=exhibitors().filter(e=>e.confirmed&&!proofs()[e.id]);const n=Math.ceil(c.length*.25);const a=c.slice().sort(()=>Math.random()-.5).slice(0,n).map(e=>e.id);const keep=(store.get("psa_proofreq",[])||[]).filter(id=>proofs()[id]);req=keep.concat(a);store.set("psa_proofreq",req);return n;}
+const proofs=()=>store.get("psa_proof",{});
+if(!req){pickReq();}
+
+function applyRole(){$$("[data-roles]").forEach(el=>el.hidden=!el.dataset.roles.split(" ").includes(role));
+ $$("#roles button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.r===role));$("#roleNote").innerHTML="<b>"+ROLES.find(r=>r[0]===role)[1]+".</b> "+NOTES[role];}
+$("#roles").innerHTML=ROLES.map(r=>'<button type="button" data-r="'+r[0]+'" aria-pressed="false">'+r[1]+'</button>').join("");
+$("#roles").onclick=e=>{const b=e.target.closest("button");if(!b)return;role=b.dataset.r;store.set("psa_role",role);renderAll();toast("Now viewing as "+ROLES.find(r=>r[0]===role)[1]);};
+
+function renderKpis(){const L=psas().map(eff),ex=exhibitors();const k=[["Active PSAs",L.filter(x=>x==="Active").length],["Expiring within 30 days",L.filter(x=>x==="Expiring").length],["Auto-archived",L.filter(x=>x==="Archived").length],["Confirmed exhibitors",ex.filter(e=>e.confirmed).length+" / "+ex.length]];
+ $("#kpis").innerHTML=k.map(x=>'<div class="stat"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>').join("");
+ const w=win();$("#winNote").innerHTML="<b>Mandatory screening window:</b> "+w.from+" to "+w.to+" · "+(TODAY>w.to?"window closed":days(w.to)+" day(s) remaining")+" (set by CBFC in the CMS).";}
+
+function renderLib(){const s=$("#lfS").value,q=$("#lfQ").value.trim().toLowerCase();
+ const r=psas().filter(p=>(!s||eff(p)===s)&&(!q||(p.title+" "+p.topic).toLowerCase().includes(q)));
+ $("#lfCnt").textContent=r.length+" of "+psas().length+" PSAs";
+ $("#lib").innerHTML=r.length?r.map(p=>{const e=eff(p),arch=e==="Archived";
+  const act=arch?'<span class="muted" style="font-size:.8rem">Auto-archived on expiry</span>':'<div class="acts"><button class="btn sec sm" data-pv="'+p.id+'">Preview</button>'+(role==="distributor"?'<button class="btn sm" data-kit="'+p.id+'">Download kit</button>':'')+(role==="officer"?'<button class="btn sm" data-flag="'+p.id+'">Flag for review</button>':'')+(role==="exhibitor"?'<button class="btn sm" data-sched="'+p.id+'">Add to schedule</button>':'')+'</div>';
+  return '<tr class="'+(arch?"muted-row":"")+'"><td>'+esc(p.id)+'</td><td><b>'+esc(p.title)+'</b></td><td>'+esc(p.topic)+'</td><td>'+esc(p.validTill)+(e==="Expiring"?'<div class="muted" style="font-size:.74rem">'+days(p.validTill)+' days left</div>':'')+'</td><td><span class="chip '+SC[e]+'">'+e+'</span></td><td>'+act+'</td></tr>';}).join(""):'<tr><td colspan="6" style="text-align:center;padding:26px" class="muted">No PSAs match your filters.</td></tr>';}
+$("#lfS").onchange=renderLib;$("#lfQ").oninput=renderLib;
+
+function renderExh(){const ex=exhibitors(),pr=proofs();
+ $("#exh").innerHTML=ex.map(e=>{const got=pr[e.id],asked=e.confirmed&&req.includes(e.id);
+  const chip=got?'<span class="chip g">Proof received</span>':asked?'<span class="chip o">Proof requested</span>':'<span class="muted" style="font-size:.8rem">Not requested</span>';
+  let a='';
+  if(role==="exhibitor"){a=e.confirmed?'<button class="btn sec sm" data-up="'+e.id+'"'+'>'+(got?"Replace proof":"Upload proof")+'</button>':'<button class="btn sm" data-cf="'+e.id+'">Confirm screening</button>';}
+  else if(role==="officer"){a=e.confirmed?(got?'<span class="muted" style="font-size:.8rem">Proof on file</span>':asked?'<span class="muted" style="font-size:.8rem">Awaiting proof</span>':'<button class="btn sec sm" data-rq="'+e.id+'">Request proof</button>'):'<button class="btn sec sm" data-rm="'+e.id+'">Send reminder</button>';}
+  else a='<span class="muted" style="font-size:.8rem">Read-only</span>';
+  return '<tr><td><b>'+esc(e.name)+'</b></td><td>'+esc(e.region)+'</td><td>'+(e.confirmed?'<span class="chip g">Confirmed</span>'+(e.at?'<div class="muted" style="font-size:.74rem">'+esc(e.at)+'</div>':''):'<span class="chip o">Pending</span>')+'</td><td>'+e.score+'%</td><td>'+chip+'</td><td><div class="acts">'+a+'</div></td></tr>';}).join("");}
+
+function renderDash(){const ex=exhibitors();const avg=Math.round(ex.reduce((a,e)=>a+e.score,0)/ex.length);
+ $("#overall").textContent=avg+"%";const b=$("#overallBar");b.setAttribute("aria-valuenow",avg);b.firstElementChild.style.width=avg+"%";b.firstElementChild.style.background=avg>=85?"var(--green)":avg>=70?"var(--saffron)":"var(--red)";
+ const reg={};ex.forEach(e=>(reg[e.region]=reg[e.region]||[]).push(e.score));const names=Object.keys(reg),vals=names.map(n=>Math.round(reg[n].reduce((a,b)=>a+b,0)/reg[n].length));
+ ADG.bars($("#regions"),names,vals,{max:100,min:0,yfmt:v=>Math.round(v),colors:vals.map(v=>v>=85?"#1F8A70":v>=70?"#E8871E":"#C0392B"),label:"Compliance score by region",h:250});
+ const c=ex.filter(e=>e.confirmed&&e.score>=85).length,p=ex.filter(e=>!(e.confirmed&&e.score>=85)&&e.score>=70).length,n=ex.length-c-p;
+ const pc=[Math.round(c/ex.length*100),Math.round(p/ex.length*100)];pc.push(100-pc[0]-pc[1]);
+ ADG.donut($("#donut"),[["Compliant",pc[0]],["Partial",pc[1]],["Non-compliant",pc[2]]],{colors:["#1F8A70","#E8871E","#C0392B"],label:"Compliance split"});}
+
+function alertsList(){const a=[],w=win();
+ psas().forEach(p=>{if(eff(p)==="Expiring")a.push({id:"exp-"+p.id,cls:"",t:"Expiring soon: "+p.title+" (valid till "+p.validTill+", "+days(p.validTill)+" days left)"});});
+ if(TODAY<=w.to&&days(w.to)<=30)a.push({id:"win-"+w.to,cls:"blue",t:"Mandatory screening window closes on "+w.to+" ("+days(w.to)+" days)"});
+ exhibitors().forEach(e=>{if(!e.confirmed)a.push({id:"pend-"+e.id,cls:"red",t:"Pending confirmation: "+e.name+" ("+e.region+")"});else if(req.includes(e.id)&&!proofs()[e.id])a.push({id:"prf-"+e.id,cls:"",t:"Proof of screening requested from "+e.name});});
+ return a;}
+function renderAlerts(){const d=store.get("psa_dismissed",[]),all=alertsList(),a=all.filter(x=>!d.includes(x.id));
+ $("#restore").hidden=!all.some(x=>d.includes(x.id));
+ $("#alerts").innerHTML=a.length?a.map(x=>'<div class="alert '+x.cls+'"><span>'+esc(x.t)+'</span><button class="btn sec sm" data-dis="'+esc(x.id)+'" aria-label="Dismiss alert: '+esc(x.t)+'">Dismiss</button></div>').join(""):'<div class="card" style="text-align:center" ><b>All clear.</b> <span class="muted">There are no active alerts.</span></div>';}
+$("#restore").onclick=()=>{store.set("psa_dismissed",[]);renderAlerts();toast("Dismissed alerts restored");};
+
+function renderAll(){applyRole();renderKpis();renderLib();renderExh();renderDash();renderAlerts();}
+
+document.addEventListener("click",ev=>{const t=ev.target.closest("button");if(!t)return;const d=t.dataset;
+ if(d.dis){const x=store.get("psa_dismissed",[]);x.push(d.dis);store.set("psa_dismissed",x);renderAlerts();toast("Alert dismissed");}
+ else if(d.pv){const p=psas().find(x=>x.id===d.pv);mdl('<h2 style="font-size:1.2rem" id="pvT">'+esc(p.title)+'</h2><span class="chip b">'+esc(p.topic)+'</span> <span class="chip '+SC[eff(p)]+'">'+eff(p)+'</span><p class="muted" style="font-size:.82rem;margin:10px 0 6px">Preview mock: a sample clip stands in for the PSA film.</p><video controls preload="metadata" src="assets/media/sample.mp4" style="width:100%;border-radius:8px;background:#000" aria-label="Preview of '+esc(p.title)+'"></video><dl class="dl"><dt>PSA ID</dt><dd>'+esc(p.id)+'</dd><dt>Valid till</dt><dd>'+esc(p.validTill)+'</dd></dl><div style="text-align:right"><button class="btn sec" data-close>Close</button></div>');}
+ else if(d.kit)toast("Distribution kit for "+d.kit+" downloaded (demo)");
+ else if(d.flag)toast(d.flag+" flagged for CBFC review");
+ else if(d.sched)toast(d.sched+" added to your screening schedule");
+ else if(d.rm){const e=D.exhibitors.find(x=>x.id==d.rm);toast("Reminder sent to "+e.name);}
+ else if(d.rq){const x=store.get("psa_proofreq",[]);if(!x.includes(+d.rq))x.push(+d.rq);req=x;store.set("psa_proofreq",x);renderAll();toast("Proof requested from "+D.exhibitors.find(e=>e.id==d.rq).name);}
+ else if(d.cf)confirmDlg(D.exhibitors.find(x=>x.id==d.cf),t);
+ else if(d.up)uploadDlg(D.exhibitors.find(x=>x.id==d.up),t);
+ else if(t.id==="randSel"){const n=pickReq();renderAll();toast("Random selection done: proof requested from "+n+" exhibitor"+(n===1?"":"s")+" (25%)");}});
+
+function confirmDlg(e,opener){mdl('<h2 style="font-size:1.2rem" id="cfT">Confirm screening</h2><p><b>'+esc(e.name)+'</b> ('+esc(e.region)+')</p><p class="muted" style="font-size:.88rem">By confirming, you digitally attest that the mandatory PSA was screened before every show during the window '+esc(win().from)+' to '+esc(win().to)+'.</p><label for="cfN">Type your name as digital signature *</label><input type="text" id="cfN" autocomplete="off"><label style="display:flex;gap:8px;font-weight:600"><input type="checkbox" id="cfC"> I confirm the screening declaration.</label><div class="err" id="cfE" role="alert"></div><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px"><button class="btn sec" data-close>Cancel</button><button class="btn ok" id="cfGo">Confirm screening</button></div>',bg=>{
+  bg.querySelector(".modal").setAttribute("aria-labelledby","cfT");
+  bg.querySelector("#cfGo").onclick=()=>{const n=bg.querySelector("#cfN").value.trim();if(n.length<3){bg.querySelector("#cfE").textContent="Enter your full name as signature.";bg.querySelector("#cfN").focus();return;}if(!bg.querySelector("#cfC").checked){bg.querySelector("#cfE").textContent="Please tick the declaration.";return;}
+   const c=conf();c[e.id]={at:"Confirmed "+TODAY+" by "+n};store.set("psa_conf",c);let msg=e.name+": screening confirmed.";
+   if(Math.random()<.25){const x=store.get("psa_proofreq",[]);x.push(e.id);req=x;store.set("psa_proofreq",x);msg+=" Selected at random: proof requested.";}
+   bg.remove();renderAll();toast(msg);};});}
+function uploadDlg(e,opener){mdl('<h2 style="font-size:1.2rem" id="upT">Upload proof of screening</h2><p><b>'+esc(e.name)+'</b></p><p class="muted" style="font-size:.88rem">Upload a screening log, show report or photograph (PDF, JPG or PNG, up to 10 MB).</p><label for="upF">Proof file *</label><input type="file" id="upF" accept=".pdf,.jpg,.jpeg,.png"><div class="err" id="upE" role="alert"></div><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px"><button class="btn sec" data-close>Cancel</button><button class="btn" id="upGo">Submit proof</button></div>',bg=>{
+  bg.querySelector(".modal").setAttribute("aria-labelledby","upT");
+  bg.querySelector("#upGo").onclick=()=>{const f=bg.querySelector("#upF").files[0];const er=bg.querySelector("#upE");if(!f){er.textContent="Please choose a file to upload.";return;}if(f.size>10*1048576){er.textContent="File is larger than 10 MB.";return;}
+   const p=proofs();p[e.id]={name:f.name,at:TODAY};store.set("psa_proof",p);bg.remove();renderAll();toast("Proof received: "+f.name);};});}
+renderAll();
+})();
+</script></body></html>

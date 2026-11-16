@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Search videos - NaViGate Bharat 2.0</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.sbar{display:flex;gap:8px;margin:22px 0 6px;align-items:stretch}
+.sbar .field{flex:1;display:flex;border:2px solid var(--line);border-radius:999px;overflow:hidden;background:var(--card)}
+.sbar .field:focus-within{border-color:var(--saffron)}
+.sbar input{border:0;border-radius:0;padding:11px 18px;font-size:1.02rem;background:transparent}
+.sbar input:focus{outline:none}
+.sbar .mic{border:0;background:var(--soft);color:var(--ink);padding:0 16px;cursor:pointer;font-size:1.15rem}
+.lay{display:grid;grid-template-columns:260px 1fr;gap:22px;margin-top:16px;align-items:start}
+.filters{position:sticky;top:84px}
+.filters fieldset{border:0;padding:0;margin:0 0 14px}
+.filters legend{font-weight:700;font-family:Cambria,Georgia,serif;font-size:1rem;padding:0;margin-bottom:4px}
+.opt{display:flex;align-items:center;gap:8px;margin:0;padding:4px 0;font-weight:500;font-size:.92rem;cursor:pointer}
+.opt input{width:17px;height:17px;accent-color:var(--navy2)}
+.opt .n{margin-left:auto;color:var(--muted);font-size:.78rem}
+.rhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.rhead select{width:auto}
+.afil{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.afil button.chip{cursor:pointer;font:inherit;font-size:.78rem;font-weight:700;padding:3px 10px}
+.afil button.chip:hover{background:var(--saffron);color:#0B1F3A}
+mark{background:#FFE08A;color:#0B1F3A;padding:0 2px;border-radius:3px}
+body.hc mark{background:#ffe600;color:#000}
+.pager{display:flex;gap:6px;justify-content:center;margin:26px 0 0;flex-wrap:wrap}
+.pager button{min-width:38px;padding:7px 11px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;font-weight:700;cursor:pointer;font:inherit;font-weight:700}
+.pager button.on{background:var(--navy2);color:#fff;border-color:var(--navy2)}
+body.hc .pager button.on{background:#ffe600;color:#000}
+.pager button:disabled{opacity:.45;cursor:not-allowed}
+.empty{text-align:center;padding:40px 20px}
+.empty .big{font-size:3rem}
+.sugg{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.sugg a{text-decoration:none}
+.ftoggle{display:none}
+@media(max-width:860px){.lay{grid-template-columns:1fr}.filters{position:static;display:none}.filters.show{display:block}.ftoggle{display:inline-block}}
+@media(max-width:600px){.sbar{flex-wrap:wrap}.sbar .btn{flex:1}}
+</style>
+</head>
+<body>
+<main class="wrap" id="main">
+  <h1 style="margin-top:22px">Videos</h1>
+  <form class="sbar" id="sform" role="search" aria-label="Search videos">
+    <div class="field">
+      <label for="q" style="position:absolute;left:-9999px">Search videos, topics, schemes</label>
+      <input id="q" type="search" placeholder="Search videos, topics, schemes" autocomplete="off">
+      <button type="button" class="mic" id="pageMic" aria-label="Voice search" title="Voice search">🎤</button>
+    </div>
+    <button class="btn" type="submit">Search</button>
+  </form>
+
+  <div class="lay">
+    <aside class="filters card" id="filters" aria-label="Filters">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h2 style="font-size:1.15rem;margin:0">Filters</h2><button type="button" class="btn sec sm" id="clearBtn1">Clear all</button></div>
+      <fieldset><legend>Category</legend><div id="fCat"></div></fieldset>
+      <fieldset><legend>Language</legend><div id="fLang"></div></fieldset>
+      <fieldset><legend>Duration</legend><div id="fDur"></div></fieldset>
+    </aside>
+
+    <section aria-label="Results">
+      <div class="rhead">
+        <div><button type="button" class="btn sec sm ftoggle" id="ftoggle" aria-expanded="false" aria-controls="filters">Show filters</button>
+        <span id="count" role="status" aria-live="polite" style="font-weight:700"></span></div>
+        <div style="display:flex;align-items:center;gap:8px"><label for="sort" style="margin:0">Sort by</label>
+          <select id="sort"><option value="relevance">Relevance</option><option value="latest">Latest</option><option value="views">Most viewed</option></select></div>
+      </div>
+      <div class="afil" id="afil" aria-label="Active filters"></div>
+      <div class="grid g3" id="results"></div>
+      <nav class="pager" id="pager" aria-label="Pagination"></nav>
+    </section>
+  </div>
+</main>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+ADG.page({nav:"videos"});
+(function(){
+  const D=ADG.D, $=ADG.$, $$=ADG.$$, esc=ADG.esc, PER=9;
+  const DURS=[["u5","Under 5 min",m=>m<5],["m510","5 to 10 min",m=>m>=5&&m<10],["o10","10 min or more",m=>m>=10]];
+  const mins=v=>{ const p=v.dur.split(":").map(Number); return p[0]+p[1]/60; };
+  const S={q:"",cats:new Set(),langs:new Set(),durs:new Set(),sort:"relevance",page:1};
+
+  /* ----- init from URL ----- */
+  (function init(){
+    const q=ADG.qs("q"); if(q) S.q=q.trim();
+    const add=(set,vals,valid)=>{ (vals||"").split(",").filter(Boolean).forEach(x=>{ const m=valid.find(y=>y.toLowerCase()===x.toLowerCase()); if(m) set.add(m); }); };
+    add(S.cats,ADG.qs("cat"),D.cats.map(c=>c.id));
+    add(S.langs,ADG.qs("lang"),D.langs);
+    add(S.durs,ADG.qs("dur"),DURS.map(d=>d[0]));
+    const s=ADG.qs("sort"); if(["relevance","latest","views"].includes(s)) S.sort=s;
+    const p=parseInt(ADG.qs("page"),10); if(p>0) S.page=p;
+  })();
+
+  /* ----- build filter controls ----- */
+  const catN=id=>D.videos.filter(v=>v.cat===id).length, langN=l=>D.videos.filter(v=>v.lang===l).length;
+  $("#fCat").innerHTML=D.cats.map(c=>'<label class="opt"><input type="checkbox" data-k="cats" value="'+c.id+'"> <span>'+c.icon+' '+esc(c.name)+'</span><span class="n">'+catN(c.id)+'</span></label>').join("");
+  $("#fLang").innerHTML=D.langs.map(l=>'<label class="opt"><input type="checkbox" data-k="langs" value="'+l+'"> <span>'+l+'</span><span class="n">'+langN(l)+'</span></label>').join("");
+  $("#fDur").innerHTML=DURS.map(d=>'<label class="opt"><input type="checkbox" data-k="durs" value="'+d[0]+'"> <span>'+d[1]+'</span><span class="n">'+D.videos.filter(v=>d[2](mins(v))).length+'</span></label>').join("");
+  $$("#filters input[type=checkbox]").forEach(cb=>cb.addEventListener("change",()=>{ cb.checked?S[cb.dataset.k].add(cb.value):S[cb.dataset.k].delete(cb.value); S.page=1; render(); }));
+
+  /* ----- matching / scoring ----- */
+  const tokens=()=>S.q.toLowerCase().split(/\s+/).filter(Boolean);
+  function score(v,tk){
+    if(!tk.length) return 0; let s=0; const t=v.title.toLowerCase();
+    const rest=(v.catName+" "+v.cat+" "+v.lang+" "+v.tags.join(" ")).toLowerCase();
+    for(const w of tk){ let ws=0; if(t.indexOf(w)>-1) ws=t.startsWith(w)?12:10; else if(rest.indexOf(w)>-1) ws=4; if(!ws) return -1; s+=ws; }
+    if(t.indexOf(S.q.toLowerCase())>-1) s+=8; return s;
+  }
+  function results(){
+    const tk=tokens();
+    let r=D.videos.map(v=>({v,s:score(v,tk)})).filter(x=>x.s>=0);
+    if(S.cats.size) r=r.filter(x=>S.cats.has(x.v.cat));
+    if(S.langs.size) r=r.filter(x=>S.langs.has(x.v.lang));
+    if(S.durs.size) r=r.filter(x=>[...S.durs].some(id=>DURS.find(d=>d[0]===id)[2](mins(x.v))));
+    if(S.sort==="latest") r.sort((a,b)=>b.v.date.localeCompare(a.v.date));
+    else if(S.sort==="views") r.sort((a,b)=>b.v.views-a.v.views);
+    else r.sort((a,b)=>(b.s-a.s)||(b.v.views-a.v.views));
+    return r.map(x=>x.v);
+  }
+  function hl(title){
+    let out=esc(title); const tk=tokens().map(w=>w.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).filter(Boolean); if(!tk.length) return out;
+    const re=new RegExp("("+tk.map(esc).join("|")+")","gi");
+    return out.replace(re,"<mark>$1</mark>");
+  }
+
+  /* ----- URL sync ----- */
+  function sync(){
+    const p=new URLSearchParams();
+    if(S.q) p.set("q",S.q); if(S.cats.size) p.set("cat",[...S.cats].join(",")); if(S.langs.size) p.set("lang",[...S.langs].join(","));
+    if(S.durs.size) p.set("dur",[...S.durs].join(",")); if(S.sort!=="relevance") p.set("sort",S.sort); if(S.page>1) p.set("page",S.page);
+    const qs=p.toString(); try{ history.replaceState(null,"",location.pathname+(qs?"?"+qs:"")); }catch(e){}
+  }
+
+  /* ----- render ----- */
+  function chip(label,kind,val){ return '<button type="button" class="chip b" data-rm="'+kind+'" data-v="'+esc(val)+'" aria-label="Remove filter '+esc(label)+'">'+esc(label)+' ✕</button>'; }
+  function render(){
+    const all=results(), pages=Math.max(1,Math.ceil(all.length/PER)); if(S.page>pages) S.page=pages;
+    const slice=all.slice((S.page-1)*PER,S.page*PER);
+    /* sync controls */
+    $("#q").value=S.q; $("#sort").value=S.sort;
+    $$("#filters input[type=checkbox]").forEach(cb=>cb.checked=S[cb.dataset.k].has(cb.value));
+    /* count */
+    const from=all.length?(S.page-1)*PER+1:0, to=Math.min(all.length,S.page*PER);
+    $("#count").textContent=all.length?(all.length+" video"+(all.length>1?"s":"")+" found"+(S.q?' for "'+S.q+'"':"")+" · showing "+from+"-"+to):"0 videos found"+(S.q?' for "'+S.q+'"':"");
+    /* chips */
+    let ch=""; if(S.q) ch+=chip('Search: '+S.q,"q",S.q);
+    S.cats.forEach(id=>ch+=chip(D.cats.find(c=>c.id===id).name,"cats",id));
+    S.langs.forEach(l=>ch+=chip(l,"langs",l));
+    S.durs.forEach(id=>ch+=chip(DURS.find(d=>d[0]===id)[1],"durs",id));
+    const any=!!ch; $("#afil").innerHTML=any?'<span class="muted" style="font-size:.82rem;font-weight:700">Active filters:</span> '+ch+' <button type="button" class="btn sec sm" id="clearBtn2">Clear filters</button>':"";
+    const c2=$("#clearBtn2"); if(c2) c2.onclick=clearAll;
+    $$("#afil [data-rm]").forEach(b=>b.onclick=()=>{ const k=b.dataset.rm,v=b.dataset.v; if(k==="q") S.q=""; else S[k].delete(v); S.page=1; render(); $("#q").focus(); });
+    /* grid */
+    const R=$("#results");
+    if(!slice.length){
+      R.style.display="block";
+      const sug=["digital","health","scheme","farming","yoga","UPI"];
+      R.innerHTML='<div class="card empty"><div class="big" aria-hidden="true">🔍</div><h2>No videos match your search</h2><p class="muted">Try removing a filter, checking the spelling, or use one of these suggestions.</p><div class="sugg">'+sug.map(s=>'<a class="chip b" href="search.html?q='+encodeURIComponent(s)+'">'+s+'</a>').join("")+'</div><p style="margin-top:18px"><button type="button" class="btn" id="clearBtn3">Clear all filters</button> <a class="btn sec" href="categories.html">Browse categories</a></p></div>';
+      $("#clearBtn3").onclick=clearAll;
+    } else {
+      R.style.display="";
+      R.innerHTML=slice.map(v=>ADG.vcard(v).replace("<h3>"+v.title+"</h3>","<h3>"+hl(v.title)+"</h3>")).join("");
+    }
+    /* pager */
+    const P=$("#pager");
+    if(pages<=1){ P.innerHTML=""; }
+    else{
+      let h='<button type="button" data-p="'+(S.page-1)+'" '+(S.page===1?"disabled":"")+' aria-label="Previous page">‹ Prev</button>';
+      for(let i=1;i<=pages;i++) h+='<button type="button" data-p="'+i+'" class="'+(i===S.page?"on":"")+'" '+(i===S.page?'aria-current="page"':"")+' aria-label="Page '+i+'">'+i+'</button>';
+      h+='<button type="button" data-p="'+(S.page+1)+'" '+(S.page===pages?"disabled":"")+' aria-label="Next page">Next ›</button>';
+      P.innerHTML=h;
+      $$("button[data-p]",P).forEach(b=>b.onclick=()=>{ S.page=+b.dataset.p; render(); window.scrollTo({top:0,behavior:"smooth"}); });
+    }
+    sync();
+  }
+  function clearAll(){ S.q="";S.cats.clear();S.langs.clear();S.durs.clear();S.sort="relevance";S.page=1;render(); ADG.toast("Filters cleared"); }
+
+  /* ----- events ----- */
+  $("#sform").addEventListener("submit",e=>{ e.preventDefault(); S.q=$("#q").value.trim(); S.page=1; render(); });
+  $("#sort").addEventListener("change",e=>{ S.sort=e.target.value; S.page=1; render(); });
+  $("#clearBtn1").onclick=clearAll;
+  $("#ftoggle").onclick=function(){ const f=$("#filters"); const s=f.classList.toggle("show"); this.setAttribute("aria-expanded",s); this.textContent=s?"Hide filters":"Show filters"; };
+  $("#pageMic").onclick=()=>{
+    const input=$("#q"), form=$("#sform"), SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const done=t=>{ input.value=t; form.requestSubmit?form.requestSubmit():form.dispatchEvent(new Event("submit",{cancelable:true})); };
+    let fell=false; const demo=why=>{ if(fell) return; fell=true; ADG.toast(why+" (demo: heard 'digital literacy')"); setTimeout(()=>done("digital literacy"),1100); };
+    if(SR){ try{ const r=new SR(); r.lang=ADG.lang()==="hi"?"hi-IN":"en-IN"; r.onresult=e=>{ fell=true; done(e.results[0][0].transcript); }; r.onerror=()=>demo("Microphone unavailable."); r.onend=()=>{ if(!fell) setTimeout(()=>demo("No speech detected."),50); }; let st=false; r.onstart=()=>{ st=true; }; r.start(); ADG.toast("Listening..."); setTimeout(()=>{ if(!st&&!fell){ try{ r.abort(); }catch(_){} demo("Microphone unavailable."); } },8000); }catch(e){ demo("Listening..."); } }
+    else demo("Listening...");
+  };
+  render();
+})();
+</script>
+</body>
+</html>

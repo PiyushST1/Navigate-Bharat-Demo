@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Categories - NaViGate Bharat 2.0</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.chero{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;border-radius:0 0 22px 22px;padding:34px 0 30px;margin-bottom:10px}
+body.hc .chero{border-bottom:2px solid #fff}
+.chero h1{color:#fff;font-size:2rem;margin:0 0 6px}
+.chero p{margin:0;color:#dbe6f3;max-width:700px}
+body.hc .chero p{color:#fff}
+.cc{display:flex;flex-direction:column;text-decoration:none;color:inherit;transition:transform .15s,box-shadow .15s;border-top:5px solid var(--cc,#12355B)}
+.cc:hover{transform:translateY(-3px);box-shadow:0 6px 18px rgba(11,31,58,.16)}
+.cc .top{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.cc .ic{width:52px;height:52px;border-radius:12px;display:grid;place-items:center;font-size:1.6rem;color:#fff;background:var(--cc);flex:none}
+body.hc .cc .ic{border:2px solid #fff}
+.cc h2{font-size:1.1rem;margin:0}
+.cc .hi{font-size:.88rem;color:var(--muted)}
+.cc .nums{display:flex;gap:16px;font-size:.82rem;color:var(--muted);margin-bottom:8px}
+.cc .nums b{color:var(--navy2);font-size:1.05rem}
+body.hc .cc .nums b{color:#ffe600}
+.cc ol{margin:0 0 12px;padding-left:20px;font-size:.88rem;flex:1}
+.cc ol li{margin-bottom:3px}
+.cc .go{font-weight:700;color:var(--blue);font-size:.88rem}
+.az{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px}
+.az span,.az a{width:32px;height:32px;display:grid;place-items:center;border-radius:6px;font-weight:700;font-size:.85rem;text-decoration:none}
+.az span{background:var(--soft);color:var(--muted);opacity:.6}
+.az a{background:var(--navy2);color:#fff}
+body.hc .az a{background:#ffe600;color:#000}
+.az a:hover{background:var(--saffron);color:#0B1F3A}
+.lrow{display:flex;gap:10px;flex-wrap:wrap}
+.lrow a{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border:1.5px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);text-decoration:none;font-weight:700}
+.lrow a:hover{border-color:var(--saffron);background:var(--soft)}
+.lrow a b{width:26px;height:26px;border-radius:50%;background:var(--navy2);color:#fff;display:grid;place-items:center;font-size:.8rem}
+body.hc .lrow a b{background:#ffe600;color:#000}
+.lrow a small{color:var(--muted);font-weight:600}
+@media(max-width:600px){.chero h1{font-size:1.55rem}}
+@media(prefers-reduced-motion:reduce){.cc{transition:none}}
+</style>
+</head>
+<body>
+<main class="wrap" id="main" style="max-width:none;padding:0">
+<section class="chero" aria-labelledby="h1"><div class="wrap">
+  <h1 id="h1">Categories <span lang="hi" style="font-weight:400">· श्रेणियां</span></h1>
+  <p>Explore the video library by topic. Choose a category to see every video in it, or browse by language below.</p>
+</div></section>
+<div class="wrap">
+  <div class="grid g4" id="grid" style="margin-top:20px"></div>
+
+  <div class="sec-title"><h2>Browse by language (A-Z)</h2><a class="btn sec sm" href="search.html">All videos</a></div>
+  <div class="card">
+    <div class="az" id="az" aria-hidden="false"></div>
+    <div class="lrow" id="lrow"></div>
+  </div>
+</div>
+</main>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+ADG.page({nav:"cats"});
+(function(){
+  const D=ADG.D, $=ADG.$, esc=ADG.esc;
+  $("#grid").innerHTML=D.cats.map(c=>{
+    const vs=D.videos.filter(v=>v.cat===c.id), views=vs.reduce((a,v)=>a+v.views,0), top=vs.slice().sort((a,b)=>b.views-a.views).slice(0,3);
+    return '<a class="card cc" style="--cc:'+c.color+'" href="search.html?cat='+encodeURIComponent(c.id)+'" aria-label="'+esc(c.name)+', '+vs.length+' videos"><div class="top"><div class="ic" aria-hidden="true">'+c.icon+'</div><div><h2>'+esc(c.name)+'</h2><div class="hi" lang="hi">'+esc(c.hi)+'</div></div></div>'+
+      '<div class="nums"><span><b>'+vs.length+'</b> videos</span><span><b>'+ADG.fmt(views)+'</b> views</span></div>'+
+      '<div style="font-size:.78rem;font-weight:700;color:var(--muted);margin-bottom:4px">TOP VIDEOS</div><ol>'+top.map(v=>'<li>'+esc(v.title)+'</li>').join("")+'</ol><span class="go">Browse '+esc(c.name)+' →</span></a>'; }).join("");
+  const langs=D.langs.slice().sort((a,b)=>a.localeCompare(b));
+  const letters=new Set(langs.map(l=>l[0].toUpperCase()));
+  $("#az").innerHTML="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(L=>{
+    const l=langs.find(x=>x[0].toUpperCase()===L);
+    return l?'<a href="search.html?lang='+encodeURIComponent(l)+'" aria-label="'+esc(l)+' videos">'+L+'</a>':'<span aria-hidden="true">'+L+'</span>'; }).join("");
+  $("#lrow").innerHTML=langs.map(l=>'<a href="search.html?lang='+encodeURIComponent(l)+'"><b>'+l[0].toUpperCase()+'</b>'+esc(l)+' <small>'+D.videos.filter(v=>v.lang===l).length+' videos</small></a>').join("");
+})();
+</script>
+</body>
+</html>

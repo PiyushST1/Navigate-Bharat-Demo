@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Analytics dashboard | NaViGate Bharat 2.0 (demo)</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.an-head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin:26px 0 16px}
+.an-head h1{font-size:1.9rem;margin:0}
+.an-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}
+.seg button{border:0;background:transparent;color:var(--ink);padding:8px 14px;font-weight:700;font-size:.88rem;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true]{background:var(--navy2);color:#fff}
+body.hc .seg button[aria-pressed=true]{background:#ffe600;color:#000}
+.an-period{font-size:.85rem;color:var(--muted);margin:-6px 0 14px}
+/* odometer */
+.odo-card{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;border-radius:var(--radius);padding:24px 18px;text-align:center;box-shadow:var(--shadow);border:1px solid var(--line)}
+.odo-card .lbl{font-size:.9rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:#cdd8e6}
+.odo{display:flex;justify-content:center;align-items:center;gap:5px;font-family:Cambria,Georgia,serif;font-size:clamp(1.7rem,8vw,4rem);margin:14px 0 8px;font-variant-numeric:tabular-nums}
+.od-col{width:.7em;height:1.25em;overflow:hidden;background:#071428;border:1px solid rgba(255,255,255,.22);border-radius:8px;box-shadow:inset 0 -10px 14px rgba(0,0,0,.35)}
+.od-strip{transition:transform .6s cubic-bezier(.3,1.2,.5,1)}
+.od-strip span{display:block;height:1.25em;line-height:1.25em;text-align:center;color:#fff;font-weight:700}
+.od-sep{color:var(--saffron);align-self:flex-end;font-size:.8em;font-weight:700;line-height:1}
+.odo-card .sub{font-size:.85rem;color:#cdd8e6}
+.live-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#37d39b;margin-right:6px;animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(55,211,155,.7)}100%{box-shadow:0 0 0 9px rgba(55,211,155,0)}}
+@media(prefers-reduced-motion:reduce){.od-strip{transition:none}.live-dot{animation:none}}
+/* stats */
+.stat .trend{display:block;margin-top:6px;font-size:.8rem;font-weight:700}
+.trend.up{color:#0f5f4c}.trend.dn{color:#8e271d}
+body.hc .trend.up{color:#00ff7f}body.hc .trend.dn{color:#ff6b6b}
+.stat .lblrow{display:flex;justify-content:space-between;align-items:center;gap:8px}
+/* cards */
+.grid>*{min-width:0}
+.card h2{font-size:1.15rem;margin:0 0 10px}
+.card .hint{font-size:.8rem;color:var(--muted);margin-top:8px}
+.chart{min-height:120px;transition:opacity .2s}
+.chart.fade{opacity:.25}
+.rank{list-style:none;margin:0;padding:0}
+.rank li{margin-bottom:12px}
+.rank .row{display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:4px;font-weight:600}
+.rank .row span:first-child:before{content:attr(data-n);display:inline-block;width:1.4em;color:var(--muted);font-weight:700}
+.rank .bar i{background:var(--blue)}
+.tscroll{overflow-x:auto}
+table.t th button{all:unset;cursor:pointer;display:inline-flex;gap:5px;align-items:center;color:#fff;font-weight:700;font-size:.82rem}
+table.t th button:focus-visible{outline:3px solid var(--saffron);outline-offset:2px}
+table.t td.num,table.t th.num{text-align:right}
+table.t td a{font-weight:700;text-decoration:none}
+table.t td a:hover{text-decoration:underline}
+.mini{display:block;height:5px;background:var(--soft);border-radius:9px;margin-top:4px;overflow:hidden;min-width:70px}
+.mini i{display:block;height:100%;background:var(--saffron)}
+.filters{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px}
+.filters>div{min-width:200px}
+.empty{padding:26px;text-align:center;color:var(--muted)}
+.note-card{display:flex;gap:16px;align-items:center;flex-wrap:wrap;border-left:6px solid var(--saffron)}
+.note-card .ic{font-size:1.8rem}
+.note-card p{margin:0;flex:1;min-width:220px}
+.sr{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+@media(max-width:600px){.an-head h1{font-size:1.5rem}.seg button{padding:8px 10px}}
+</style>
+</head>
+<body>
+<main class="wrap" id="main">
+  <div class="an-head">
+    <div>
+      <h1>Analytics dashboard</h1>
+      <div class="muted">Portal usage, streaming and availability (sample data for demonstration)</div>
+    </div>
+    <div class="an-tools">
+      <div class="seg" role="group" aria-label="Date range">
+        <button type="button" data-r="3" aria-pressed="false">Last 3 months</button>
+        <button type="button" data-r="6" aria-pressed="false">Last 6 months</button>
+        <button type="button" data-r="12" aria-pressed="false">Last 12 months</button>
+      </div>
+      <button type="button" class="btn" id="exportBtn">Export report (CSV)</button>
+    </div>
+  </div>
+  <div class="an-period" id="period" role="status" aria-live="polite"></div>
+
+  <section class="odo-card" aria-label="Hit counter">
+    <div class="lbl"><span class="live-dot" aria-hidden="true"></span>Total portal hits since launch</div>
+    <div class="odo" id="odo" role="img" aria-label="Total hits"></div>
+    <div class="sub">Live counter · <span id="odoSess">+0</span> hits while you have been on this page</div>
+  </section>
+
+  <div class="grid g4" style="margin-top:18px" id="stats" aria-label="Key figures"></div>
+  <div class="hint muted" id="statNote" style="font-size:.78rem;margin-top:6px"></div>
+
+  <div class="grid g2" style="margin-top:18px">
+    <div class="card"><h2>Visits, streams and downloads</h2><div class="chart" id="cLine"></div></div>
+    <div class="card"><h2>Monthly visits</h2><div class="chart" id="cBar"></div><div class="hint">Latest month highlighted.</div></div>
+  </div>
+
+  <div class="grid g3" style="margin-top:18px">
+    <div class="card"><h2>Device split</h2><div id="cDev"></div></div>
+    <div class="card"><h2>Language split</h2><div id="cLang"></div></div>
+    <div class="card"><h2>Top states by visits</h2><ol class="rank" id="states"></ol><div class="hint" id="stateNote"></div></div>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <div class="sec-title" style="margin:0 0 10px"><h2 style="font-size:1.2rem;margin:0">Top 10 videos</h2></div>
+    <div class="filters">
+      <div><label for="catF">Category</label><select id="catF"></select></div>
+      <button type="button" class="btn sec sm" id="resetF">Reset filter</button>
+      <span class="muted" id="vcount" style="font-size:.85rem" role="status" aria-live="polite"></span>
+    </div>
+    <div class="tscroll">
+      <table class="t" id="vt">
+        <caption class="sr">Top videos by views</caption>
+        <thead><tr>
+          <th scope="col">#</th><th scope="col">Title</th><th scope="col">Category</th><th scope="col">Language</th><th scope="col">Duration</th>
+          <th scope="col" class="num" aria-sort="descending" id="thViews"><button type="button" id="sortViews" aria-label="Sort by views">Views <span id="arrow" aria-hidden="true">▼</span></button></th>
+          <th scope="col">Published</th>
+        </tr></thead>
+        <tbody id="vbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card note-card" style="margin-top:18px">
+    <div class="ic" aria-hidden="true">📅</div>
+    <p><b>Reporting reminder.</b> Monthly downtime report and quarterly security report are due by the 7th.</p>
+    <a class="btn warn" href="sla.html">Open service status and SLA monitor</a>
+  </div>
+</main>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+ADG.page({nav:"analytics"});
+(function(){
+  const A=ADG.D.analytics, V=ADG.D.videos, C=ADG.D.cats, $=ADG.$, $$=ADG.$$, esc=ADG.esc, fmt=ADG.fmt, store=ADG.store;
+  const nf=n=>Math.round(n).toLocaleString("en-IN");
+  const MY=["Dec 2025","Jan 2026","Feb 2026","Mar 2026","Apr 2026","May 2026","Jun 2026","Jul 2026","Aug 2026","Sep 2026","Oct 2026","Nov 2026"];
+  const sum=a=>a.reduce((x,y)=>x+y,0), avg=a=>sum(a)/a.length;
+  let range=store.get("an_range",6); if([3,6,12].indexOf(range)<0) range=6;
+  let sortDir=store.get("an_sort","desc")==="asc"?"asc":"desc";
+  let catF="all";
+  const PRIOR_YEAR={visits:.64,streams:.61,downloads:.57,uptime:99.81};
+
+  /* ---------- odometer ---------- */
+  const odo=$("#odo"); let cols=[], hits=Math.max(A.hitCounter, +store.get("hits",0)||0), sess=0, built="";
+  function build(n){
+    const s=nf(n).replace(/,/g,","); built=s; cols=[]; odo.innerHTML="";
+    s.split("").forEach(ch=>{
+      if(ch===","){ const e=document.createElement("span"); e.className="od-sep"; e.textContent=","; e.setAttribute("aria-hidden","true"); odo.appendChild(e); return; }
+      const col=document.createElement("span"); col.className="od-col"; col.setAttribute("aria-hidden","true");
+      const strip=document.createElement("span"); strip.className="od-strip"; strip.style.display="block";
+      let h=""; for(let k=0;k<20;k++) h+="<span>"+(k%10)+"</span>"; strip.innerHTML=h; col.appendChild(strip); odo.appendChild(col);
+      const o={strip:strip,d:+ch}; strip.style.transition="none"; strip.style.transform="translateY(-"+(o.d*1.25)+"em)"; cols.push(o);
+    });
+    void odo.offsetWidth; cols.forEach(o=>o.strip.style.transition="");
+    odo.setAttribute("aria-label","Total hits "+nf(n));
+  }
+  function setDigit(o,d){
+    if(o.d===d) return; const target=d<o.d?d+10:d; o.d=d;
+    o.strip.style.transform="translateY(-"+(target*1.25)+"em)";
+    if(target>=10) setTimeout(()=>{ o.strip.style.transition="none"; o.strip.style.transform="translateY(-"+(d*1.25)+"em)"; void o.strip.offsetWidth; o.strip.style.transition=""; },700);
+  }
+  function showHits(n){
+    const s=nf(n); if(s.length!==built.length){ build(n); return; }
+    const ds=s.replace(/,/g,"").split(""); cols.forEach((o,i)=>setDigit(o,+ds[i]));
+    odo.setAttribute("aria-label","Total hits "+s);
+  }
+  build(hits);
+  function tick(){
+    const inc=1+Math.floor(Math.random()*6); hits+=inc; sess+=inc; store.set("hits",hits); showHits(hits);
+    $("#odoSess").textContent="+"+nf(sess);
+    setTimeout(tick,1100+Math.random()*1400);
+  }
+  setTimeout(tick,1200);
+
+  /* ---------- period stats ---------- */
+  function periodStats(n){
+    const s=12-n, cur={visits:sum(A.visits.slice(s)),streams:sum(A.streams.slice(s)),downloads:sum(A.downloads.slice(s)),uptime:avg(A.uptime.slice(s))};
+    let prev, baseline=false;
+    if(s-n>=0){ prev={visits:sum(A.visits.slice(s-n,s)),streams:sum(A.streams.slice(s-n,s)),downloads:sum(A.downloads.slice(s-n,s)),uptime:avg(A.uptime.slice(s-n,s))}; }
+    else { baseline=true; prev={visits:cur.visits*PRIOR_YEAR.visits,streams:cur.streams*PRIOR_YEAR.streams,downloads:cur.downloads*PRIOR_YEAR.downloads,uptime:PRIOR_YEAR.uptime}; }
+    return {cur,prev,baseline};
+  }
+  function trendHtml(cur,prev,n,isPP){
+    const d=isPP?cur-prev:(cur-prev)/prev*100, up=d>=0, txt=(up?"+":"")+(isPP?d.toFixed(2)+" pp":d.toFixed(1)+"%");
+    return '<span class="trend '+(up?"up":"dn")+'" aria-label="'+(up?"Up ":"Down ")+esc(txt)+' versus previous '+n+' months"><span aria-hidden="true">'+(up?"▲":"▼")+'</span> '+txt+' vs previous '+n+' months</span>';
+  }
+  function renderStats(){
+    const ps=periodStats(range), c=ps.cur, p=ps.prev, pass=c.uptime>=99.5;
+    $("#stats").innerHTML=
+      '<div class="stat"><span>Total visits</span><b>'+fmt(c.visits)+'</b>'+trendHtml(c.visits,p.visits,range)+'</div>'+
+      '<div class="stat"><span>Video streams</span><b>'+fmt(c.streams)+'</b>'+trendHtml(c.streams,p.streams,range)+'</div>'+
+      '<div class="stat"><span>Downloads</span><b>'+fmt(c.downloads)+'</b>'+trendHtml(c.downloads,p.downloads,range)+'</div>'+
+      '<div class="stat"><div class="lblrow"><span>Average uptime</span><span class="chip '+(pass?"g":"r")+'">'+(pass?"Meets 99.5% target":"Below target")+'</span></div><b>'+c.uptime.toFixed(2)+'%</b>'+trendHtml(c.uptime,p.uptime,range,true)+'</div>';
+    $("#statNote").textContent=ps.baseline?"The 12-month comparison uses a sample prior-year baseline because the data set holds only 12 months.":"";
+  }
+
+  /* ---------- charts ---------- */
+  function renderCharts(){
+    const s=12-range, lab=A.months.slice(s), L=[$("#cLine"),$("#cBar")];
+    L.forEach(e=>e.classList.add("fade"));
+    setTimeout(()=>{
+      ADG.line($("#cLine"),lab,[
+        {name:"Visits",color:"#12355B",values:A.visits.slice(s)},
+        {name:"Streams",color:"#E8871E",values:A.streams.slice(s)},
+        {name:"Downloads",color:"#1F8A70",values:A.downloads.slice(s)}],{label:"Line chart of visits, streams and downloads for the last "+range+" months",h:250});
+      const vals=A.visits.slice(s), colors=vals.map((v,i)=>i===vals.length-1?"#E8871E":"#2F6DB5");
+      ADG.bars($("#cBar"),lab,vals,{colors:colors,label:"Bar chart of monthly visits for the last "+range+" months",h:250});
+      L.forEach(e=>e.classList.remove("fade"));
+    },120);
+    $("#period").textContent="Showing "+MY[s]+" to "+MY[11]+" ("+range+" months)";
+  }
+  ADG.donut($("#cDev"),A.devices,{label:"Donut chart of device split"});
+  ADG.donut($("#cLang"),A.languages,{label:"Donut chart of language split"});
+  (function(){ const mx=Math.max.apply(null,A.states.map(x=>x[1])); $("#states").innerHTML=A.states.map((x,i)=>'<li><div class="row"><span data-n="'+(i+1)+'.">'+esc(x[0])+'</span><span>'+x[1].toFixed(1)+'%</span></div><div class="bar" role="img" aria-label="'+esc(x[0])+' '+x[1]+' percent of visits"><i style="width:'+(x[1]/mx*100)+'%"></i></div></li>').join("");
+    $("#stateNote").textContent="These six states account for "+sum(A.states.map(x=>x[1])).toFixed(1)+"% of all visits."; })();
+
+  /* ---------- videos table ---------- */
+  $("#catF").innerHTML='<option value="all">All categories</option>'+C.map(c=>'<option value="'+c.id+'">'+esc(c.name)+'</option>').join("");
+  function renderVideos(){
+    let list=V.filter(v=>catF==="all"||v.cat===catF).sort((a,b)=>b.views-a.views).slice(0,10);
+    if(sortDir==="asc") list.reverse();
+    const mx=Math.max.apply(null,V.map(v=>v.views));
+    $("#arrow").textContent=sortDir==="desc"?"▼":"▲"; $("#thViews").setAttribute("aria-sort",sortDir==="desc"?"descending":"ascending");
+    $("#sortViews").setAttribute("aria-label","Sort by views, currently "+(sortDir==="desc"?"highest first":"lowest first")+". Activate to reverse.");
+    $("#vcount").textContent=list.length?("Showing "+list.length+" video"+(list.length>1?"s":"")+(catF==="all"?" (top 10 overall)":" in this category")):"";
+    $("#vbody").innerHTML=list.length?list.map((v,i)=>'<tr><td>'+(sortDir==="desc"?i+1:list.length-i)+'</td><td><a href="video.html?id='+v.id+'">'+esc(v.title)+'</a></td><td><span class="chip b">'+esc(v.catName)+'</span></td><td>'+esc(v.lang)+'</td><td>'+v.dur+'</td><td class="num"><b>'+nf(v.views)+'</b><span class="mini"><i style="width:'+(v.views/mx*100)+'%"></i></span></td><td>'+v.date+'</td></tr>').join(""):'<tr><td colspan="7" class="empty">No videos match this category yet.</td></tr>';
+  }
+  $("#sortViews").onclick=()=>{ sortDir=sortDir==="desc"?"asc":"desc"; store.set("an_sort",sortDir); renderVideos(); };
+  $("#catF").onchange=e=>{ catF=e.target.value; renderVideos(); };
+  $("#resetF").onclick=()=>{ catF="all"; $("#catF").value="all"; renderVideos(); ADG.toast("Filter cleared"); };
+
+  /* ---------- range ---------- */
+  function setRange(n,quiet){
+    range=n; store.set("an_range",n);
+    $$(".seg button").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.r===n)));
+    renderStats(); renderCharts(); if(!quiet) ADG.toast("Showing last "+n+" months");
+  }
+  $$(".seg button").forEach(b=>b.onclick=()=>setRange(+b.dataset.r));
+
+  /* ---------- CSV export ---------- */
+  const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  $("#exportBtn").onclick=()=>{
+    const s=12-range, ps=periodStats(range), rows=[];
+    rows.push(["NaViGate Bharat 2.0 (demonstration) - Analytics report"]);
+    rows.push(["Period","Last "+range+" months ("+MY[s]+" to "+MY[11]+")"]);
+    rows.push(["Generated",new Date().toISOString().slice(0,10)]);
+    rows.push(["Note","Sample data for demonstration only"]);
+    rows.push([]);
+    rows.push(["Month","Visits","Streams","Downloads","Uptime %"]);
+    for(let i=s;i<12;i++) rows.push([MY[i],A.visits[i],A.streams[i],A.downloads[i],A.uptime[i]]);
+    rows.push(["Total / average",sum(A.visits.slice(s)),sum(A.streams.slice(s)),sum(A.downloads.slice(s)),ps.cur.uptime.toFixed(2)]);
+    rows.push(["Previous period"+(ps.baseline?" (sample baseline)":""),Math.round(ps.prev.visits),Math.round(ps.prev.streams),Math.round(ps.prev.downloads),ps.prev.uptime.toFixed(2)]);
+    rows.push([]); rows.push(["Device split","Share %"]); A.devices.forEach(d=>rows.push(d));
+    rows.push([]); rows.push(["Language split","Share %"]); A.languages.forEach(d=>rows.push(d));
+    rows.push([]); rows.push(["Top states","Share of visits %"]); A.states.forEach(d=>rows.push(d));
+    rows.push([]); rows.push(["Rank","Top videos","Category","Language","Views"]);
+    V.slice().sort((a,b)=>b.views-a.views).slice(0,10).forEach((v,i)=>rows.push([i+1,v.title,v.catName,v.lang,v.views]));
+    const csv="﻿"+rows.map(r=>r.map(q).join(",")).join("\r\n");
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}), url=URL.createObjectURL(blob), a=document.createElement("a");
+    a.href=url; a.download="navigate-bharat-analytics-last-"+range+"-months.csv"; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1500); ADG.toast("Report downloaded: "+a.download);
+  };
+
+  renderVideos(); setRange(range,true);
+})();
+</script>
+</body>
+</html>

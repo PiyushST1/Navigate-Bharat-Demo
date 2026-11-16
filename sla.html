@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Service status and SLA monitor | NaViGate Bharat 2.0 (demo)</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.pg-head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin:26px 0 16px}
+.pg-head h1{font-size:1.9rem;margin:0}
+.status{border-radius:var(--radius);padding:22px 24px;color:#fff;background:linear-gradient(135deg,#14705a,#1F8A70);box-shadow:var(--shadow);display:flex;gap:18px;align-items:center;flex-wrap:wrap;border:1px solid var(--line)}
+.status.bad{background:linear-gradient(135deg,#8e271d,#C0392B)}
+body.hc .status,body.hc .status.bad{background:#000;border:2px solid #fff}
+.status .big{font-family:Cambria,Georgia,serif;font-size:clamp(1.5rem,5vw,2.4rem);font-weight:700;line-height:1.1}
+.status .dot{width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 0 0 0 rgba(255,255,255,.7);animation:pulse 1.8s infinite;flex:none}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.7)}100%{box-shadow:0 0 0 14px rgba(255,255,255,0)}}
+@media(prefers-reduced-motion:reduce){.status .dot{animation:none}}
+.status .sub{opacity:.95;font-size:.92rem;margin-top:4px}
+.status .comps{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.status .comps span{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:3px 11px;font-size:.78rem;font-weight:700}
+.grid>*{min-width:0}
+.card h2{font-size:1.15rem;margin:0 0 10px}
+.hint{font-size:.8rem;color:var(--muted);margin-top:8px}
+.tiles{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:12px 0}
+.tiles button{border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 2px;cursor:pointer;font-size:.72rem;line-height:1.25;font-weight:600}
+.tiles button b{display:block;font-size:.8rem}
+.tiles button.pass{border-bottom:4px solid var(--green)}
+.tiles button.fail{border-bottom:4px solid var(--red)}
+.tiles button[aria-pressed=true]{background:var(--navy2);color:#fff;border-color:var(--navy2)}
+body.hc .tiles button[aria-pressed=true]{background:#ffe600;color:#000}
+.bigpct{font-family:Cambria,Georgia,serif;font-size:2.6rem;font-weight:700;color:var(--navy2);line-height:1}
+body.hc .bigpct{color:#ffe600}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-top:12px;font-size:.88rem}
+.kv div span{display:block;color:var(--muted);font-size:.76rem;font-weight:700}
+.row2{display:flex;gap:12px;align-items:center}
+.row2 input[type=number]{max-width:130px}
+.row2 input[type=range]{flex:1;min-width:120px;accent-color:var(--navy2)}
+.result{margin-top:14px;padding:14px;border-radius:10px;background:var(--soft);border:1px solid var(--line)}
+.result .amt{font-family:Cambria,Georgia,serif;font-size:1.9rem;font-weight:700;line-height:1.1}
+.err{color:var(--red);font-size:.8rem;font-weight:700;margin-top:4px;min-height:1em}
+body.hc .err{color:#ff6b6b}
+table.t tr.cur td{background:#FCE9D2;font-weight:700;color:#0B1F3A}
+body.hc table.t tr.cur td{background:#222;color:#ffe600}
+.tscroll{overflow-x:auto}
+.filters{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px}
+.filters>div{min-width:170px}
+.empty{padding:26px;text-align:center;color:var(--muted)}
+.chart svg{display:block}
+.tgt{display:flex;gap:10px;align-items:center}
+.mini{display:block;height:6px;background:var(--soft);border-radius:9px;overflow:hidden;min-width:90px;border:1px solid var(--line);margin-top:4px}
+.mini i{display:block;height:100%;background:var(--green)}
+.drgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.drgrid .stat b{font-size:1.7rem}
+.sr{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.err-field{border-color:var(--red)!important}
+.rep dl{display:grid;grid-template-columns:160px 1fr;gap:6px 14px;margin:0 0 14px;font-size:.9rem}
+.rep dt{font-weight:700;color:var(--muted)} .rep dd{margin:0}
+.rep h3{font-size:1.3rem}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+@media(max-width:600px){.pg-head h1{font-size:1.5rem}.status .comps{margin-left:0}.drgrid{grid-template-columns:1fr}.rep dl{grid-template-columns:1fr}}
+@media print{
+  body>*:not(.modal-bg){display:none!important}
+  .modal-bg{position:static!important;background:none!important;display:block!important}
+  .modal{max-width:none!important;width:100%!important;max-height:none!important;border:0!important;padding:0!important}
+  .noprint{display:none!important}
+}
+</style>
+</head>
+<body>
+<main class="wrap" id="main">
+  <div class="pg-head">
+    <div>
+      <h1>Service status and SLA monitor</h1>
+      <div class="muted">Application management view: availability, incidents, penalty slabs and escalation (sample data)</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn warn" id="repBtn">Report an incident</button>
+      <button type="button" class="btn sec" id="dtBtn">Monthly downtime report</button>
+    </div>
+  </div>
+
+  <section class="status" id="banner" aria-label="Current service status"></section>
+
+  <div class="grid g2" style="margin-top:18px">
+    <section class="card" aria-labelledby="h-up">
+      <h2 id="h-up">Monthly availability vs target</h2>
+      <label for="monthSel">Select month</label>
+      <select id="monthSel"></select>
+      <div class="tiles" id="tiles" role="group" aria-label="Pick a month"></div>
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div class="bigpct" id="mPct"></div><span class="chip" id="mChip"></span><span class="muted" style="font-size:.85rem">Target: 99.5% per month</span></div>
+      <div class="kv" id="mKv"></div>
+      <div class="btnrow"><button type="button" class="btn sec sm" id="useMonth">Use this month in the penalty calculator</button></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-calc">
+      <h2 id="h-calc">Penalty slab calculator <span class="chip o">Illustrative</span></h2>
+      <div class="grid g2" style="gap:12px">
+        <div>
+          <label for="upNum">Uptime achieved (%)</label>
+          <div class="row2"><input type="number" id="upNum" min="0" max="100" step="0.01" value="99.20" inputmode="decimal" aria-describedby="upErr"><input type="range" id="upRng" min="90" max="100" step="0.01" value="99.20" aria-label="Uptime slider, 90 to 100 percent"></div>
+          <div class="err" id="upErr" role="alert"></div>
+        </div>
+        <div>
+          <label for="inst">Quarterly instalment value (&#8377;, illustrative)</label>
+          <input type="text" id="inst" inputmode="numeric" value="1,00,00,000" autocomplete="off" aria-describedby="instErr">
+          <div class="err" id="instErr" role="alert"></div>
+        </div>
+      </div>
+      <div class="result" aria-live="polite">
+        <div class="muted" style="font-size:.8rem;font-weight:700">Applicable slab</div>
+        <div id="slabName" style="font-weight:700;font-size:1.05rem"></div>
+        <div style="display:flex;gap:26px;flex-wrap:wrap;margin-top:8px">
+          <div><div class="muted" style="font-size:.8rem;font-weight:700">Penalty amount</div><div class="amt" id="penAmt"></div></div>
+          <div><div class="muted" style="font-size:.8rem;font-weight:700">Instalment payable</div><div class="amt" id="payAmt" style="color:var(--green)"></div></div>
+        </div>
+      </div>
+      <div class="tscroll" style="margin-top:12px">
+        <table class="t" id="slabTbl"><caption class="sr">Penalty slabs</caption>
+          <thead><tr><th scope="col">Monthly uptime</th><th scope="col">Penalty (% of instalment)</th></tr></thead>
+          <tbody id="slabBody"></tbody></table>
+      </div>
+      <div class="hint">Illustrative figures for the demonstration. Actual slabs and amounts follow the signed contract.</div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:18px" aria-labelledby="h-chart">
+    <h2 id="h-chart">Uptime, last 12 months</h2>
+    <div class="chart" id="cUp"></div>
+    <div class="hint">Dashed red line marks the 99.5% target.</div>
+  </section>
+
+  <section class="card" style="margin-top:18px" aria-labelledby="h-inc">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2 id="h-inc" style="margin:0">Incident log</h2><div><button type="button" class="btn warn sm" id="repBtn2">Report an incident</button> <button type="button" class="btn sec sm" id="resetInc" hidden>Remove reported demo incidents</button></div></div>
+    <div class="filters" style="margin-top:12px">
+      <div><label for="fSev">Severity</label><select id="fSev"><option value="">All severities</option><option>S1</option><option>S2</option><option>S3</option><option>S4</option></select></div>
+      <div><label for="fSta">Status</label><select id="fSta"><option value="">All statuses</option><option>Open</option><option>In progress</option><option>Resolved</option></select></div>
+      <button type="button" class="btn sec sm" id="fReset">Reset filters</button>
+      <span class="muted" id="incCount" style="font-size:.85rem" role="status" aria-live="polite"></span>
+    </div>
+    <div class="tscroll">
+      <table class="t"><caption class="sr">Incidents</caption>
+        <thead><tr><th scope="col">ID</th><th scope="col">Severity</th><th scope="col">Incident</th><th scope="col">Opened</th><th scope="col">Time to resolve</th><th scope="col">Status</th><th scope="col">Owner</th></tr></thead>
+        <tbody id="incBody"></tbody></table>
+    </div>
+  </section>
+
+  <div class="grid g2" style="margin-top:18px">
+    <section class="card" aria-labelledby="h-esc">
+      <h2 id="h-esc">Escalation matrix</h2>
+      <div class="tscroll"><table class="t"><caption class="sr">Escalation matrix</caption>
+        <thead><tr><th scope="col">Level</th><th scope="col">Who</th><th scope="col">Handles</th><th scope="col">Escalate if</th></tr></thead>
+        <tbody>
+          <tr><td><span class="chip b">L1</span></td><td><b>Support desk</b><br><span class="muted">Help desk, first response</span></td><td>Logging, triage, known fixes, S3 and S4 issues</td><td>No acknowledgement in 15 min, or S1/S2 raised</td></tr>
+          <tr><td><span class="chip o">L2</span></td><td><b>On-site Project Lead</b><br><span class="muted">At the client location</span></td><td>S1/S2 incidents, root-cause analysis, coordination with the client team</td><td>Not resolved within the resolution target, or repeat incident</td></tr>
+          <tr><td><span class="chip r">L3</span></td><td><b>Programme Manager</b><br><span class="muted">Vendor leadership</span></td><td>Major outages, SLA breaches, customer communication</td><td>Final level: management review</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-tgt">
+      <h2 id="h-tgt">Response and resolution targets</h2>
+      <div class="tscroll"><table class="t"><caption class="sr">Response and resolution targets with actual</caption>
+        <thead><tr><th scope="col">Severity</th><th scope="col">Response target</th><th scope="col">Resolution target</th><th scope="col">Actual (Nov 2026)</th><th scope="col">Result</th></tr></thead>
+        <tbody id="tgtBody"></tbody></table></div>
+      <div class="hint">Actual is the time taken to resolve the incident closed in the month for that severity.</div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:18px" aria-labelledby="h-dr">
+    <h2 id="h-dr">Backup and disaster recovery <span class="chip o">Proposed</span></h2>
+    <div class="grid g3" style="gap:14px">
+      <div>
+        <div class="drgrid">
+          <div class="stat"><span>Recovery time objective</span><b>4 h</b><span class="chip o">Proposed</span></div>
+          <div class="stat"><span>Recovery point objective</span><b>24 h</b><span class="chip o">Proposed</span></div>
+        </div>
+      </div>
+      <div>
+        <ul style="margin:6px 0;padding-left:18px">
+          <li><b>Daily incremental backup</b> of database, media metadata and configuration (proposed).</li>
+          <li><b>Weekly full backup</b> stored in a separate location (proposed).</li>
+          <li>Restore drill each quarter, with the result added to the downtime report (proposed).</li>
+        </ul>
+      </div>
+      <div class="muted" style="font-size:.88rem;align-self:center">These values are proposals for discussion with the client. They are not measured results and will be finalised in the Service Level Agreement.</div>
+    </div>
+  </section>
+</main>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+ADG.page({nav:""});
+(function(){
+  const A=ADG.D.analytics, $=ADG.$, $$=ADG.$$, esc=ADG.esc, store=ADG.store;
+  const MY=["Dec 2025","Jan 2026","Feb 2026","Mar 2026","Apr 2026","May 2026","Jun 2026","Jul 2026","Aug 2026","Sep 2026","Oct 2026","Nov 2026"];
+  const MK=["2025-12","2026-01","2026-02","2026-03","2026-04","2026-05","2026-06","2026-07","2026-08","2026-09","2026-10","2026-11"];
+  const DAYS=[31,31,28,31,30,31,30,31,31,30,31,30], TARGET=99.5;
+  const nf=n=>Math.round(n).toLocaleString("en-IN");
+  const rupee=n=>"₹ "+nf(n);
+  function dur(m){ if(!m) return "-"; if(m<60) return m+" min"; if(m<1440){ const h=Math.floor(m/60), r=m%60; return h+" h"+(r?" "+r+" min":""); } const d=Math.floor(m/1440), h=Math.round((m%1440)/60); return d+" day"+(d>1?"s":"")+(h?" "+h+" h":""); }
+  function dt(m){ const mm=Math.round(m); return mm<60?mm+" min":Math.floor(mm/60)+" h "+(mm%60)+" min"; }
+  const sevChip=s=>'<span class="chip '+({S1:"r",S2:"o",S3:"b",S4:""}[s]||"")+'">'+esc(s)+'</span>';
+  const staChip=s=>'<span class="chip '+({"Resolved":"g","In progress":"o","Open":"r"}[s]||"")+'">'+esc(s)+'</span>';
+  function allInc(){ return store.get("incidents_new",[]).concat(ADG.D.incidents); }
+
+  /* ---------- modal helper (Esc, focus, trap) ---------- */
+  function openModal(html,labelId,onMount){
+    const prev=document.activeElement;
+    const bg=ADG.modal(html,function(b){ if(onMount) onMount(b); });
+    const dlg=bg.firstElementChild; if(labelId) dlg.setAttribute("aria-labelledby",labelId);
+    const focusables=()=>[...dlg.querySelectorAll("button,input,select,textarea,a[href]")].filter(e=>!e.disabled);
+    const f=focusables(); if(f.length) f[0].focus();
+    bg.addEventListener("keydown",e=>{
+      if(e.key==="Escape"){ bg.remove(); }
+      else if(e.key==="Tab"){ const l=focusables(); if(!l.length) return; const a=l[0], z=l[l.length-1]; if(e.shiftKey&&document.activeElement===a){ e.preventDefault(); z.focus(); } else if(!e.shiftKey&&document.activeElement===z){ e.preventDefault(); a.focus(); } }
+    });
+    new MutationObserver((m,o)=>{ if(!document.body.contains(bg)){ o.disconnect(); if(prev&&prev.focus) prev.focus(); } }).observe(document.body,{childList:true});
+    return bg;
+  }
+
+  /* ---------- status banner ---------- */
+  function renderBanner(){
+    const inc=allInc(), open=inc.filter(i=>i.status!=="Resolved"), s1=open.filter(i=>i.sev==="S1"), b=$("#banner");
+    const comps=["Public portal","Video streaming","Search","CMS","Community Radio"];
+    const hi=open.length?open.map(i=>i.sev).sort()[0]:"";
+    if(s1.length){
+      b.className="status bad";
+      b.innerHTML='<span class="dot" aria-hidden="true"></span><div><div class="big">Major incident in progress</div><div class="sub">'+esc(s1[0].id)+' ('+esc(s1[0].title)+') is being handled. Escalated to L2 and L3. Updates every 30 minutes.</div></div><div class="comps"><span>Under investigation</span></div>';
+    } else {
+      b.className="status";
+      b.innerHTML='<span class="dot" aria-hidden="true"></span><div><div class="big">All systems operational</div><div class="sub">'+(open.length?open.length+" open incident"+(open.length>1?"s":"")+" being handled (highest severity "+hi+"). No service-affecting outage.":"No open incidents.")+' Last checked: 15 Nov 2026</div></div><div class="comps">'+comps.map(c=>'<span>'+c+': OK</span>').join("")+'</div>';
+    }
+  }
+
+  /* ---------- month selector ---------- */
+  let mi=11;
+  $("#monthSel").innerHTML=MY.map((m,i)=>'<option value="'+i+'">'+m+' ('+A.uptime[i].toFixed(2)+'%)</option>').join("");
+  $("#tiles").innerHTML=MY.map((m,i)=>'<button type="button" data-i="'+i+'" class="'+(A.uptime[i]>=TARGET?"pass":"fail")+'" aria-pressed="false" aria-label="'+m+', uptime '+A.uptime[i].toFixed(2)+' percent, '+(A.uptime[i]>=TARGET?"pass":"fail")+'"><b>'+m.slice(0,3)+'</b>'+A.uptime[i].toFixed(2)+'</button>').join("");
+  function downMins(i){ return DAYS[i]*1440*(100-A.uptime[i])/100; }
+  function renderMonth(){
+    const u=A.uptime[mi], pass=u>=TARGET, down=downMins(mi), allowed=DAYS[mi]*1440*(100-TARGET)/100;
+    $("#monthSel").value=mi;
+    $$("#tiles button").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.i===mi)));
+    $("#mPct").textContent=u.toFixed(2)+"%";
+    const c=$("#mChip"); c.className="chip "+(pass?"g":"r"); c.textContent=pass?"PASS: meets target":"FAIL: below target";
+    const diff=u-TARGET;
+    $("#mKv").innerHTML='<div><span>Month</span>'+MY[mi]+'</div><div><span>Margin vs target</span>'+(diff>=0?"+":"")+diff.toFixed(2)+' percentage points</div><div><span>Downtime recorded</span>'+dt(down)+'</div><div><span>Downtime allowed at 99.5%</span>'+dt(allowed)+'</div>';
+  }
+  $("#monthSel").onchange=e=>{ mi=+e.target.value; renderMonth(); renderUpChart(); };
+  $("#tiles").onclick=e=>{ const b=e.target.closest("button"); if(b){ mi=+b.dataset.i; renderMonth(); renderUpChart(); } };
+  $("#useMonth").onclick=()=>{ setUptime(A.uptime[mi]); ADG.toast("Calculator set to "+A.uptime[mi].toFixed(2)+"% ("+MY[mi]+")"); $("#upNum").focus(); };
+
+  /* ---------- uptime chart ---------- */
+  function renderUpChart(){
+    const el=$("#cUp");
+    ADG.line(el,MY.map(m=>m.slice(0,3)),[
+      {name:"Monthly uptime",color:"#12355B",values:A.uptime},
+      {name:"Target 99.5%",color:"#C0392B",values:A.uptime.map(()=>TARGET)}
+    ],{min:99.4,max:100,h:260,yfmt:v=>v.toFixed(2)+"%",label:"Line chart of monthly uptime for 12 months against the 99.5 percent target"});
+    $$('path[stroke="#C0392B"]',el).forEach(p=>{ p.setAttribute("stroke-dasharray","7 5"); });
+    $$('circle[fill="#C0392B"]',el).forEach(c=>c.remove());
+    const circles=$$('circle[fill="#12355B"]',el); if(circles[mi]){ circles[mi].setAttribute("r","6.5"); circles[mi].setAttribute("stroke","#E8871E"); circles[mi].setAttribute("stroke-width","3"); }
+  }
+
+  /* ---------- penalty calculator ---------- */
+  const SL=[{min:99.5,pct:0,range:"99.5% and above",name:"No penalty"},{min:99,pct:2,range:"99.00% to 99.49%",name:"Slab 1"},{min:98,pct:5,range:"98.00% to 98.99%",name:"Slab 2"},{min:97,pct:7,range:"97.00% to 97.99%",name:"Slab 3"},{min:-1,pct:10,range:"Below 97%",name:"Slab 4"}];
+  const slabOf=u=>SL.find(s=>u>=s.min);
+  function getInst(){ return parseInt(($("#inst").value||"").replace(/\D/g,""),10)||0; }
+  function setUptime(v){ v=Math.max(0,Math.min(100,v)); $("#upNum").value=v.toFixed(2); $("#upRng").value=Math.max(90,v); calc(); }
+  function calc(){
+    const raw=$("#upNum").value, u=parseFloat(raw), inst=getInst(), ue=$("#upErr"), ie=$("#instErr");
+    const badU=raw===""||isNaN(u)||u<0||u>100; ue.textContent=badU?"Enter an uptime between 0 and 100.":""; $("#upNum").classList.toggle("err-field",badU); $("#upNum").setAttribute("aria-invalid",String(badU));
+    const noI=inst<=0; ie.textContent=noI?"Enter an instalment value greater than zero.":""; $("#inst").classList.toggle("err-field",noI); $("#inst").setAttribute("aria-invalid",String(noI));
+    $("#slabBody").innerHTML=SL.map(s=>'<tr data-pct="'+s.pct+'"><td>'+s.range+'</td><td>'+(s.pct?s.pct+"%":"None")+'</td></tr>').join("");
+    if(badU||noI){ $("#slabName").textContent="Enter valid values to see the result"; $("#penAmt").textContent="-"; $("#payAmt").textContent="-"; return; }
+    const s=slabOf(u), pen=inst*s.pct/100;
+    $$("#slabBody tr").forEach((r,i)=>{ const on=SL[i]===s; r.classList.toggle("cur",on); if(on) r.setAttribute("aria-current","true"); });
+    $("#slabName").textContent=s.name+": "+s.range+" ("+(s.pct?s.pct+"% of the instalment":"no penalty")+")";
+    $("#penAmt").textContent=rupee(pen); $("#payAmt").textContent=rupee(inst-pen);
+  }
+  $("#upNum").addEventListener("input",()=>{ const v=parseFloat($("#upNum").value); if(!isNaN(v)) $("#upRng").value=Math.max(90,Math.min(100,v)); calc(); });
+  $("#upRng").addEventListener("input",()=>{ $("#upNum").value=parseFloat($("#upRng").value).toFixed(2); calc(); });
+  $("#inst").addEventListener("input",e=>{
+    const el=e.target, pos=el.selectionStart, before=el.value.slice(0,pos).replace(/\D/g,"").length;
+    let d=el.value.replace(/\D/g,"").replace(/^0+(?=\d)/,"").slice(0,12);
+    el.value=d?Number(d).toLocaleString("en-IN"):"";
+    let n=0,p=0; while(p<el.value.length&&n<before){ if(/\d/.test(el.value[p])) n++; p++; }
+    try{ el.setSelectionRange(p,p); }catch(x){}
+    calc();
+  });
+
+  /* ---------- incident table ---------- */
+  function renderInc(){
+    const sv=$("#fSev").value, st=$("#fSta").value, all=allInc(), neu=store.get("incidents_new",[]).length;
+    const list=all.filter(i=>(!sv||i.sev===sv)&&(!st||i.status===st));
+    $("#incCount").textContent="Showing "+list.length+" of "+all.length+" incidents";
+    $("#resetInc").hidden=!neu;
+    $("#incBody").innerHTML=list.length?list.map(i=>'<tr><td><b>'+esc(i.id)+'</b>'+(i.isNew?' <span class="chip g">NEW</span>':'')+'</td><td>'+sevChip(i.sev)+'</td><td>'+esc(i.title)+'</td><td>'+esc(i.opened)+'</td><td>'+(i.status==="Resolved"?dur(i.mins):'<span class="muted">In progress</span>')+'</td><td>'+staChip(i.status)+'</td><td>'+esc(i.owner)+'</td></tr>').join(""):'<tr><td colspan="7" class="empty">No incidents match these filters.</td></tr>';
+  }
+  $("#fSev").onchange=renderInc; $("#fSta").onchange=renderInc;
+  $("#fReset").onclick=()=>{ $("#fSev").value=""; $("#fSta").value=""; renderInc(); };
+  $("#resetInc").onclick=()=>{ store.set("incidents_new",[]); renderInc(); renderBanner(); ADG.toast("Reported demo incidents removed"); };
+
+  /* ---------- report an incident ---------- */
+  function reportForm(){
+    const u=ADG.user();
+    openModal('<h2 id="rTitle" style="font-size:1.3rem">Report an incident</h2><p class="muted" style="margin-top:0">The incident is logged with the support desk (L1) and shown at the top of the incident log.</p>'+
+      '<form id="rForm" novalidate>'+
+      '<label for="rT">Short title *</label><input type="text" id="rT" maxlength="120" placeholder="e.g. Video not playing on mobile" aria-describedby="rTe"><div class="err" id="rTe" role="alert"></div>'+
+      '<div class="grid g2" style="gap:12px"><div><label for="rS">Severity *</label><select id="rS"><option value="S1">S1 Critical outage</option><option value="S2">S2 Major degradation</option><option value="S3" selected>S3 Minor issue</option><option value="S4">S4 Cosmetic</option></select></div>'+
+      '<div><label for="rC">Affected area</label><select id="rC"><option>Public portal</option><option>Video streaming</option><option>Search</option><option>CMS and admin</option><option>Community Radio</option><option>Other</option></select></div></div>'+
+      '<label for="rD">Description</label><textarea id="rD" rows="3" placeholder="What happened, when, and who is affected?"></textarea>'+
+      '<label for="rW">Reported by *</label><input type="text" id="rW" value="'+esc(u.name||"")+'" aria-describedby="rWe"><div class="err" id="rWe" role="alert"></div>'+
+      '<div class="btnrow"><button type="submit" class="btn warn">Submit incident</button><button type="button" class="btn sec" data-close>Cancel</button></div></form>',"rTitle",function(bg){
+        const form=bg.querySelector("#rForm");
+        form.addEventListener("submit",function(e){
+          e.preventDefault();
+          const t=bg.querySelector("#rT").value.trim(), w=bg.querySelector("#rW").value.trim();
+          bg.querySelector("#rTe").textContent=t.length<5?"Enter a title of at least 5 characters.":"";
+          bg.querySelector("#rWe").textContent=w?"":"Enter the reporter's name.";
+          bg.querySelector("#rT").classList.toggle("err-field",t.length<5); bg.querySelector("#rW").classList.toggle("err-field",!w);
+          if(t.length<5){ bg.querySelector("#rT").focus(); return; } if(!w){ bg.querySelector("#rW").focus(); return; }
+          const arr=store.get("incidents_new",[]), n=ADG.D.incidents.length+arr.length;
+          const id="INC-"+(2410+n+1), d=new Date(), p=x=>String(x).padStart(2,"0");
+          const stamp=d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes());
+          const sev=bg.querySelector("#rS").value;
+          arr.unshift({id:id,sev:sev,title:t,opened:stamp,resolved:"",mins:0,status:"Open",owner:"Support desk (L1)",area:bg.querySelector("#rC").value,desc:bg.querySelector("#rD").value.trim(),by:w,isNew:true});
+          store.set("incidents_new",arr);
+          bg.remove(); $("#fSev").value=""; $("#fSta").value=""; renderInc(); renderBanner();
+          ADG.toast(id+" logged and assigned to the support desk (L1)");
+          const tb=$("#incBody"); if(tb) tb.scrollIntoView({behavior:"smooth",block:"center"});
+        });
+      });
+  }
+  $("#repBtn").onclick=reportForm; $("#repBtn2").onclick=reportForm;
+
+  /* ---------- targets table ---------- */
+  function toMin(s){ const m=s.match(/([\d.]+)\s*(min|h|day)/); if(!m) return 0; return +m[1]*({min:1,h:60,day:1440}[m[2]]); }
+  $("#tgtBody").innerHTML=ADG.D.sla.map(r=>{
+    const tgt=toMin(r[3]), act=r[4], has=act>0, ok=act<=tgt, pc=has?Math.min(100,act/tgt*100):0;
+    return '<tr><td><b>'+esc(r[0])+'</b><br><span class="muted">'+esc(r[1])+'</span></td><td>'+esc(r[2])+'</td><td>'+esc(r[3])+'</td><td>'+(has?dur(act)+'<span class="mini" role="img" aria-label="'+Math.round(pc)+' percent of target used"><i style="width:'+pc+'%;background:'+(ok?"var(--green)":"var(--red)")+'"></i></span>':'<span class="muted">None closed</span>')+'</td><td>'+(has?'<span class="chip '+(ok?"g":"r")+'">'+(ok?"Within target":"Breached")+'</span>':'<span class="chip">No data</span>')+'</td></tr>';
+  }).join("");
+
+  /* ---------- monthly downtime report ---------- */
+  function csvDownload(name,rows){
+    const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+    const blob=new Blob(["﻿"+rows.map(r=>r.map(q).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8"}), url=URL.createObjectURL(blob), a=document.createElement("a");
+    a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }
+  $("#dtBtn").onclick=function(){
+    const u=A.uptime[mi], pass=u>=TARGET, down=downMins(mi), allowed=DAYS[mi]*1440*(100-TARGET)/100, s=slabOf(u);
+    const incs=allInc().filter(i=>i.opened.slice(0,7)===MK[mi]);
+    const inc=incs.length?'<div class="tscroll"><table class="t"><thead><tr><th scope="col">ID</th><th scope="col">Sev</th><th scope="col">Incident</th><th scope="col">Time to resolve</th><th scope="col">Status</th></tr></thead><tbody>'+incs.map(i=>'<tr><td>'+esc(i.id)+'</td><td>'+esc(i.sev)+'</td><td>'+esc(i.title)+'</td><td>'+(i.status==="Resolved"?dur(i.mins):"-")+'</td><td>'+esc(i.status)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="muted">No incidents are recorded in the sample data for this month.</p>';
+    openModal('<div class="rep"><h3 id="dTitle">Monthly downtime report: '+MY[mi]+'</h3><p class="muted" style="margin-top:0">NaViGate Bharat 2.0 (demonstration). Prepared by ADG Online Solutions Pvt. Ltd. Sample data. Due by the 7th of the following month.</p>'+
+      '<dl><dt>Availability</dt><dd><b>'+u.toFixed(2)+'%</b></dd><dt>Target</dt><dd>99.5% per month</dd><dt>Result</dt><dd>'+(pass?'<span class="chip g">PASS</span>':'<span class="chip r">FAIL</span>')+'</dd><dt>Total downtime</dt><dd>'+dt(down)+'</dd><dt>Allowed at target</dt><dd>'+dt(allowed)+'</dd><dt>Penalty slab (illustrative)</dt><dd>'+esc(s.range)+': '+(s.pct?s.pct+"% of the quarterly instalment":"no penalty")+'</dd></dl>'+
+      '<h3 style="font-size:1.05rem">Incidents in the month</h3>'+inc+
+      '<div class="btnrow noprint"><button type="button" class="btn" id="dPrint">Print or save as PDF</button><button type="button" class="btn sec" id="dCsv">Download CSV</button><button type="button" class="btn sec" data-close>Close</button></div></div>',"dTitle",function(bg){
+        bg.querySelector("#dPrint").onclick=()=>window.print();
+        bg.querySelector("#dCsv").onclick=()=>{ const rows=[["Monthly downtime report",MY[mi]],["Availability %",u.toFixed(2)],["Target %",TARGET],["Result",pass?"PASS":"FAIL"],["Downtime (min)",down.toFixed(1)],["Allowed (min)",allowed.toFixed(1)],[],["Incident","Severity","Title","Status"]].concat(incs.map(i=>[i.id,i.sev,i.title,i.status])); const n="downtime-report-"+MK[mi]+".csv"; csvDownload(n,rows); ADG.toast("Downloaded "+n); };
+      });
+  };
+
+  renderBanner(); renderMonth(); renderUpChart(); calc(); renderInc();
+})();
+</script>
+</body>
+</html>

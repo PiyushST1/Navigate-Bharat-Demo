@@ -1,0 +1,201 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Community Radio Stations · NaViGate Bharat 2.0</title><link rel="stylesheet" href="assets/css/style.css">
+<style>
+.live-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--green);margin-right:6px;animation:pulse 1.6s infinite}
+.paused .live-dot{animation:none;background:var(--muted)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(31,138,112,.6)}70%{box-shadow:0 0 0 8px rgba(31,138,112,0)}100%{box-shadow:0 0 0 0 rgba(31,138,112,0)}}
+@media(prefers-reduced-motion:reduce){.live-dot{animation:none}}
+.stat small{display:block;font-size:.74rem;color:var(--muted);margin-top:2px}
+.stat.flash b{color:var(--green)}
+.stat b{transition:color .4s}
+.filters{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;align-items:end}
+@media(max-width:900px){.filters{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.filters{grid-template-columns:1fr}}
+.fchips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 4px;align-items:center}
+.fchip{border:1px solid #b6cdea;background:#DCE8F6;color:#1d4a82;border-radius:999px;padding:3px 6px 3px 11px;font-weight:700;font-size:.78rem;cursor:pointer}
+.fchip:hover{background:#c8dbf1}
+.ep{display:flex;flex-direction:column;gap:8px}
+.ep h3{font-size:1.05rem;margin:0}
+.ep .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ep .acts{display:flex;gap:8px;margin-top:auto;padding-top:6px;flex-wrap:wrap}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.err{color:var(--red);font-size:.8rem;font-weight:700;margin-top:3px;min-height:1px}
+.invalid{border-color:var(--red)!important}
+.fl{margin:8px 0 0;padding:0;list-style:none;font-size:.82rem}
+.fl li{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed var(--line)}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+@media(max-width:700px){.fgrid{grid-template-columns:1fr}}
+.dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.9rem;margin:12px 0}
+.dl dt{font-weight:700;color:var(--muted)} .dl dd{margin:0}
+.tblwrap{overflow-x:auto}
+.confirm{border-left:6px solid var(--green)}
+.tabs button:focus-visible{outline-offset:-3px}
+</style></head><body><main class="wrap" id="main">
+<div class="sec-title"><div><h1 style="margin:0;font-size:1.9rem">Community Radio Stations</h1><div class="muted">Programme dashboard, episode browser and National Community Radio Awards · sample data</div></div>
+<div id="livebox" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="chip g"><i class="live-dot"></i><span id="liveTxt">Live · updated just now</span></span><button class="btn sec sm" id="pauseBtn" aria-pressed="false">Pause live updates</button></div></div>
+
+<div><div class="tabs" role="tablist" aria-label="Community radio sections"><button class="on" role="tab" aria-selected="true" data-pane="p-dash" id="t-dash">Dashboard &amp; episodes</button><button role="tab" aria-selected="false" data-pane="p-awards" id="t-awards">National Community Radio Awards</button></div>
+<section class="pane on" id="p-dash" role="tabpanel" aria-labelledby="t-dash">
+<div class="grid g3" id="stats" aria-label="Key figures"></div>
+<div class="grid g2" style="margin-top:18px">
+ <div class="card"><h2 style="font-size:1.1rem">Episodes by theme</h2><div class="muted" style="font-size:.8rem" id="themeNote"></div><div id="chTheme"></div></div>
+ <div class="card"><h2 style="font-size:1.1rem">Episodes by language</h2><div class="muted" style="font-size:.8rem">Share of catalogue episodes</div><div id="chLang" style="margin-top:8px"></div></div>
+</div>
+<div class="sec-title"><h2>Episode browser</h2><div class="muted" id="count" aria-live="polite"></div></div>
+<div class="card">
+ <form class="filters" id="ff" role="search" aria-label="Filter episodes" onsubmit="return false">
+  <div><label for="fs">State / UT</label><select id="fs"></select></div>
+  <div><label for="fl">Language</label><select id="fl"></select></div>
+  <div><label for="ft">Theme</label><select id="ft"></select></div>
+  <div><label for="fq">Search</label><input type="search" id="fq" placeholder="Title or station"></div>
+ </form>
+ <div class="fchips" id="fchips" aria-label="Active filters"></div>
+</div>
+<div class="grid g2" id="eps" style="margin-top:18px"></div>
+<div id="more" style="text-align:center;margin-top:16px"></div>
+</section>
+
+<section class="pane" id="p-awards" role="tabpanel" aria-labelledby="t-awards">
+ <div class="card" id="awForm">
+  <h2 style="font-size:1.3rem">Submit an award nomination</h2>
+  <p class="muted" style="margin-top:0">Single-window submission for the National Community Radio Awards. All fields marked * are required.</p>
+  <form id="af" novalidate>
+   <div class="fgrid">
+    <div><label for="aSt">Station *</label><select id="aSt" aria-describedby="eSt"></select><div class="err" id="eSt" role="alert"></div></div>
+    <div><label for="aCat">Award category *</label><select id="aCat" aria-describedby="eCat"></select><div class="err" id="eCat" role="alert"></div></div>
+   </div>
+   <label for="aNar">Narrative (why this station deserves the award) *</label>
+   <textarea id="aNar" rows="5" maxlength="1200" aria-describedby="nCnt eNar" placeholder="Describe the programme, community reach and measurable impact."></textarea>
+   <div style="display:flex;justify-content:space-between;gap:8px"><div class="err" id="eNar" role="alert"></div><div class="muted" id="nCnt" style="font-size:.8rem;white-space:nowrap">0 / 1200 (minimum 100)</div></div>
+   <fieldset style="border:1px solid var(--line);border-radius:10px;margin:12px 0 0;padding:6px 14px 12px"><legend style="font-weight:700;font-size:.85rem;padding:0 6px">Supporting documents * (at least one, max 10 MB each)</legend>
+    <div class="fgrid">
+     <div><label for="d1">Station profile / licence copy</label><input type="file" id="d1" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"></div>
+     <div><label for="d2">Sample programme script or recording</label><input type="file" id="d2" accept=".pdf,.doc,.docx,.mp3,.mp4,.wav"></div>
+     <div><label for="d3">Impact evidence (letters, photos)</label><input type="file" id="d3" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"></div>
+    </div>
+    <ul class="fl" id="fnames" aria-live="polite"><li class="muted">No files selected</li></ul>
+    <div class="err" id="eDoc" role="alert"></div>
+   </fieldset>
+   <label style="display:flex;gap:8px;align-items:flex-start;font-weight:600;margin-top:14px"><input type="checkbox" id="aDec" style="margin-top:4px"> <span>I declare that the information and documents submitted are true and the nomination is made with the consent of the station management. *</span></label>
+   <div class="err" id="eDec" role="alert"></div>
+   <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn" type="submit">Submit nomination</button><button class="btn sec" type="reset" id="aReset">Reset</button></div>
+  </form>
+ </div>
+ <div class="card confirm" id="awConf" hidden tabindex="-1">
+  <h2 style="font-size:1.3rem;color:var(--green)">Nomination submitted</h2>
+  <p>Your nomination has been received through the single window. Please quote this reference number in all communication.</p>
+  <div class="stat" style="display:inline-block;margin:6px 0 12px"><b id="refNo" style="font-size:1.6rem"></b><span>Reference number</span></div>
+  <dl class="dl" id="confDl"></dl>
+  <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" id="another">Submit another nomination</button><a class="btn sec" href="#awStatus" id="toStatus">View status table</a></div>
+ </div>
+ <div class="sec-title" id="awStatus"><h2>Award nominations status</h2><div class="muted" id="awCnt"></div></div>
+ <div class="card tblwrap" style="padding:0"><table class="t" aria-label="Award nominations status"><thead><tr><th>Ref / ID</th><th>Station</th><th>Category</th><th>Submitted</th><th>Docs</th><th>Status</th></tr></thead><tbody id="awRows"></tbody></table></div>
+</section>
+</div>
+</main>
+<script src="assets/js/data.js"></script><script src="assets/js/app.js"></script>
+<script>
+ADG.page({nav:"crs"});
+(function(){
+const {D,$,$$,store,toast,esc}=ADG, TODAY="2026-11-15";
+const stations=()=>store.get("crs_stations",null)||D.stations;
+const reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+function mdl(html,fn){const bg=ADG.modal(html,fn);const k=e=>{if(!bg.isConnected){document.removeEventListener("keydown",k);return;}if(e.key==="Escape"){bg.remove();document.removeEventListener("keydown",k);}};document.addEventListener("keydown",k);const f=bg.querySelector("button,input,select,textarea");f&&f.focus();return bg;}
+
+/* ---------- episode catalogue (D.episodes plus extra sample episodes) ---------- */
+const EXTRA=[["Seed to market: farmers' stories","Kisan Vani","Hindi","29:30","Agriculture"],["Mothers' circle: nutrition talk","Gram Swar","Hindi","14:20","Women & Child"],["Fisherfolk and the changing coast","Coastal Awaaz","Malayalam","20:05","Environment"],["Bamboo craft of the hills","Radio Hill Voice","Khasi","17:50","Culture"],["Rainwater harvesting in the Thar","Desert Echo","Marwari","32:40","Environment"],["Cooperative dairy: a village model","Sahyadri Samvad","Marathi","23:15","Agriculture"],["Know your rights: RTI explained","Cauvery Community Radio","Kannada","26:10","Civic Awareness"],["Floating schools of the delta","Brahmaputra FM","Assamese","19:30","Education"],["Baul songs and storytellers","Sundarban Betar","Bengali","24:00","Culture"],["Honey hunters: safety first","Sundarban Betar","Bengali","12:45","Environment"],["Tea workers' health camp","Nilgiri Kural","Tamil","18:30","Health"],["Apple growers and the e-mandi","Himalayan Pulse","Garhwali","21:00","Agriculture"],["Folk tales for children","Himalayan Pulse","Garhwali","15:00","Culture"],["Fishing ban season: livelihoods","Konkan Tarang","Konkani","27:45","Environment"],["Girls' football league","Radio Hill Voice","Khasi","16:55","Women & Child"],["Online classes at the panchayat hall","Brahmaputra FM","Assamese","30:00","Education"],["Disaster alerts on the radio","Coastal Awaaz","Malayalam","35:10","Civic Awareness"],["Self-help group success","Sahyadri Samvad","Marathi","22:30","Women & Child"]];
+const EPS=D.episodes.concat(EXTRA.map((e,i)=>({id:D.episodes.length+i+1,title:e[0],station:e[1],lang:e[2],dur:e[3],theme:e[4]})));
+const mins=d=>{const p=d.split(":").map(Number);return p[0]+(p[1]||0)/60;};
+const valid=e=>{const m=mins(e.dur);return m>=15&&m<=30;};
+const stateOf=e=>{const s=stations().find(x=>x.name===e.station);return s?s.state:"Not listed";};
+
+/* ---------- stat cards ---------- */
+const S=stations();
+const tot={episodes:S.reduce((a,s)=>a+s.episodes,0),hours:S.reduce((a,s)=>a+s.hours,0),languages:new Set(S.map(s=>s.lang)).size,stations:S.length,states:new Set(S.map(s=>s.state)).size};
+tot.downloads=tot.episodes*38+1204;
+const CARDS=[["episodes","Episodes","published on the portal"],["languages","Languages","covered by stations"],["hours","Hours of content","total programme time"],["stations","Stations","community radio stations"],["states","States / UTs","with active stations"],["downloads","Downloads","programme downloads"]];
+$("#stats").innerHTML=CARDS.map(c=>'<div class="stat" data-card="'+c[0]+'"><b data-k="'+c[0]+'">0</b><span>'+c[1]+'</span><small>'+c[2]+'</small></div>').join("");
+const cur={};
+const show=k=>{$('[data-k="'+k+'"]').textContent=Math.round(cur[k]).toLocaleString("en-IN");};
+CARDS.forEach(c=>{const k=c[0];cur[k]=reduce?tot[k]:0;if(reduce)show(k);else{const t0=performance.now();(function st(t){const p=Math.min(1,(t-t0)/900);cur[k]=tot[k]*(1-Math.pow(1-p,3));show(k);if(p<1)requestAnimationFrame(st);else{cur[k]=tot[k];show(k);}})(t0);}});
+let paused=false,last=Date.now();
+function bump(k,n){tot[k]+=n;cur[k]=tot[k];show(k);const el=$('[data-card="'+k+'"]');el.classList.add("flash");setTimeout(()=>el.classList.remove("flash"),900);}
+setInterval(()=>{if(paused||document.hidden)return;bump("downloads",1+Math.floor(Math.random()*9));if(Math.random()<.5)bump("hours",1);if(Math.random()<.4)bump("episodes",1);last=Date.now();$("#liveTxt").textContent="Live · updated just now";},3000);
+setInterval(()=>{if(paused)return;const s=Math.round((Date.now()-last)/1000);$("#liveTxt").textContent="Live · updated "+(s<2?"just now":s+" s ago");},1000);
+$("#pauseBtn").onclick=function(){paused=!paused;this.setAttribute("aria-pressed",paused);this.textContent=paused?"Resume live updates":"Pause live updates";$("#livebox").classList.toggle("paused",paused);$("#liveTxt").textContent=paused?"Paused":"Live · updated just now";last=Date.now();};
+
+/* ---------- charts ---------- */
+function count(key){const m={};EPS.forEach(e=>m[e[key]||e.theme]=(m[e[key]||e.theme]||0)+1);return Object.entries(m).sort((a,b)=>b[1]-a[1]);}
+(function charts(){const th=count("theme");const cols=["#12355B","#E8871E","#1F8A70","#2F6DB5","#5B3FA6","#C2185B","#6B8E23","#6B7A90"];
+ ADG.bars($("#chTheme"),th.map(x=>esc(x[0])),th.map(x=>x[1]),{colors:th.map((x,i)=>cols[i%cols.length]),yfmt:v=>Math.round(v),label:"Episodes by theme",h:250});
+ $("#themeNote").textContent="Catalogue sample: "+EPS.length+" episodes across "+th.length+" themes";
+ const lg=count("lang");const tot2=EPS.length;let items=lg.slice(0,5).map(x=>[x[0],Math.round(x[1]/tot2*100)]);const rest=lg.slice(5).reduce((a,b)=>a+b[1],0);if(rest)items.push(["Other",100-items.reduce((a,b)=>a+b[1],0)]);
+ ADG.donut($("#chLang"),items,{label:"Episodes by language"});})();
+
+/* ---------- browser ---------- */
+const f={state:"",lang:"",theme:"",q:""};let shown=8;
+function opts(sel,arr,all){sel.innerHTML='<option value="">'+all+'</option>'+arr.map(x=>'<option>'+esc(x)+'</option>').join("");}
+opts($("#fs"),[...new Set(stations().map(s=>s.state))].sort(),"All states / UTs");
+opts($("#fl"),[...new Set(EPS.map(e=>e.lang))].sort(),"All languages");
+opts($("#ft"),[...new Set(EPS.map(e=>e.theme))].sort(),"All themes");
+const LBL={state:"State",lang:"Language",theme:"Theme",q:"Search"},SEL={state:"#fs",lang:"#fl",theme:"#ft",q:"#fq"};
+function filtered(){const q=f.q.trim().toLowerCase();return EPS.filter(e=>(!f.state||stateOf(e)===f.state)&&(!f.lang||e.lang===f.lang)&&(!f.theme||e.theme===f.theme)&&(!q||(e.title+" "+e.station).toLowerCase().includes(q)));}
+function badge(e){return valid(e)?'<span class="chip g">✔ Duration OK (15-30 min)</span>':'<span class="chip r">✖ Outside 15-30 min</span>';}
+function render(){const r=filtered();
+ const act=Object.keys(f).filter(k=>f[k]);
+ $("#fchips").innerHTML=act.length?act.map(k=>'<button type="button" class="fchip" data-rm="'+k+'" aria-label="Remove filter '+LBL[k]+': '+esc(f[k])+'">'+LBL[k]+': '+esc(f[k])+' ✕</button>').join("")+'<button type="button" class="btn sec sm" id="clr">Clear all</button>':'<span class="muted" style="font-size:.82rem">No filters applied</span>';
+ $("#count").textContent=r.length+" of "+EPS.length+" episodes";
+ $("#eps").innerHTML=r.length?r.slice(0,shown).map(e=>'<article class="card ep"><h3>'+esc(e.title)+'</h3><div class="row"><span class="chip b">'+esc(e.theme)+'</span><span class="chip">'+esc(e.lang)+'</span><span class="chip">'+esc(stateOf(e))+'</span></div><div class="muted" style="font-size:.85rem">📻 '+esc(e.station)+' · ⏱ '+e.dur+' min</div><div>'+badge(e)+'</div><div class="acts"><button class="btn sm" data-pv="'+e.id+'" aria-label="Preview '+esc(e.title)+'">▶ Preview</button><button class="btn sec sm" data-dl="'+e.id+'" aria-label="Download '+esc(e.title)+'"'+(valid(e)?'':' aria-describedby="dlnote"')+'>⬇ Download</button></div></article>').join("")+'<span id="dlnote" hidden>Download is available only for programmes of 15 to 30 minutes.</span>':'<div class="card" style="grid-column:1/-1;text-align:center;padding:36px"><div style="font-size:2rem" aria-hidden="true">🔎</div><h3>No episodes match these filters</h3><p class="muted">Try removing a filter or searching with different words.</p><button class="btn" id="clr2">Clear all filters</button></div>';
+ $("#more").innerHTML=r.length>shown?'<button class="btn sec" id="loadMore">Show more ('+(r.length-shown)+' remaining)</button>':"";}
+function setF(k,v){f[k]=v;shown=8;$(SEL[k]).value=v;render();}
+["state","lang","theme"].forEach(k=>$(SEL[k]).onchange=e=>setF(k,e.target.value));
+$("#fq").oninput=e=>{f.q=e.target.value;shown=8;render();};
+document.addEventListener("click",ev=>{const t=ev.target.closest("button");if(!t)return;
+ if(t.dataset.rm){setF(t.dataset.rm,"");$(SEL[t.dataset.rm]).focus();}
+ else if(t.id==="clr"||t.id==="clr2"){Object.keys(f).forEach(k=>{f[k]="";$(SEL[k]).value="";});shown=8;render();}
+ else if(t.id==="loadMore"){shown+=8;render();}
+ else if(t.dataset.pv)preview(EPS.find(e=>e.id==t.dataset.pv),t);
+ else if(t.dataset.dl)download(EPS.find(e=>e.id==t.dataset.dl));});
+function download(e){if(!valid(e)){toast("Download blocked: duration "+e.dur+" min is outside the permitted 15-30 min range.");return;}
+ const nm=e.title.replace(/[^a-z0-9]+/gi,"_"),a=document.createElement("a");
+ if(location.protocol==="file:"){a.href=URL.createObjectURL(new Blob(["Programme: "+e.title+"\r\nStation: "+e.station+"\r\nLanguage: "+e.lang+"\r\nDuration: "+e.dur+" min\r\n\r\nDemo package: in the live portal this file is the programme audio.\r\n"],{type:"text/plain"}));a.download=nm+"_info.txt";}
+ else{a.href="assets/media/sample.mp4";a.download=nm+".mp4";}
+ document.body.appendChild(a);a.click();a.remove();bump("downloads",1);toast("Download started: "+e.title);}
+function preview(e,opener){mdl('<h2 style="font-size:1.25rem" id="pvT">'+esc(e.title)+'</h2><div class="row" style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip b">'+esc(e.theme)+'</span><span class="chip">'+esc(e.lang)+'</span></div><p class="muted" style="font-size:.82rem;margin:10px 0 6px">Audio-preview mock: a sample media file stands in for the programme audio.</p><video controls preload="metadata" src="assets/media/sample.mp4" style="width:100%;border-radius:8px;background:#000" aria-label="Audio preview of '+esc(e.title)+' (mock)"></video><dl class="dl"><dt>Station</dt><dd>'+esc(e.station)+'</dd><dt>State / UT</dt><dd>'+esc(stateOf(e))+'</dd><dt>Programme duration</dt><dd>'+e.dur+' min</dd><dt>Validation</dt><dd>'+badge(e)+'</dd></dl><div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap"><button class="btn sec" data-close>Close</button><button class="btn" id="pvDl">⬇ Download</button></div>',bg=>{bg.querySelector(".modal").setAttribute("aria-labelledby","pvT");bg.querySelector("#pvDl").onclick=()=>download(e);bg.querySelector("[data-close]").addEventListener("click",()=>opener&&opener.focus());});}
+render();
+
+/* ---------- tabs ---------- */
+ADG.tabs();
+$$(".tabs button").forEach(b=>b.addEventListener("click",()=>$$(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b))));
+if(location.hash==="#awards")$("#t-awards").click();
+
+/* ---------- awards ---------- */
+const STC={"Submitted":"b","Under review":"o","Approved":"g","Returned":"r"};
+function allAwards(){const ov=store.get("awards_status",{}),nt=store.get("awards_notes",{});return store.get("awards_new",[]).slice().reverse().concat(D.awards).map(a=>Object.assign({},a,{status:ov[a.id]||a.status,note:nt[a.id]||""}));}
+function renderAw(){const a=allAwards();$("#awCnt").textContent=a.length+" nominations";
+ $("#awRows").innerHTML=a.map(x=>'<tr><td><b>'+esc(x.ref||x.id)+'</b>'+(x.ref?'<div class="muted" style="font-size:.74rem">'+esc(x.id)+'</div>':'')+'</td><td>'+esc(x.station)+'</td><td>'+esc(x.cat)+'</td><td>'+esc(x.date)+'</td><td>'+x.docs+'</td><td><span class="chip '+(STC[x.status]||"")+'">'+esc(x.status)+'</span>'+(x.note?'<div class="muted" style="font-size:.74rem;margin-top:3px">Note: '+esc(x.note)+'</div>':'')+'</td></tr>').join("");}
+$("#aSt").innerHTML='<option value="">Select a station</option>'+stations().map(s=>'<option>'+esc(s.name)+'</option>').join("");
+$("#aCat").innerHTML='<option value="">Select a category</option>'+D.awardCats.map(c=>'<option>'+esc(c)+'</option>').join("");
+const nar=$("#aNar");nar.oninput=()=>{const n=nar.value.length;$("#nCnt").textContent=n+" / 1200 (minimum 100)";$("#nCnt").style.color=n>=100?"var(--green)":"";};
+const files={};
+function listFiles(){const k=Object.keys(files).filter(x=>files[x]);$("#fnames").innerHTML=k.length?k.map(x=>'<li><span>📎 '+esc(files[x].name)+'</span><span class="muted">'+(files[x].size/1024<1024?(files[x].size/1024).toFixed(0)+" KB":(files[x].size/1048576).toFixed(1)+" MB")+'</span></li>').join(""):'<li class="muted">No files selected</li>';}
+["d1","d2","d3"].forEach(id=>$("#"+id).onchange=e=>{files[id]=e.target.files[0]||null;listFiles();$("#eDoc").textContent="";});
+function err(id,msg,inp){$("#"+id).textContent=msg;if(inp)inp.classList.toggle("invalid",!!msg);if(inp)inp.setAttribute("aria-invalid",!!msg);return !msg;}
+$("#af").addEventListener("reset",()=>{setTimeout(()=>{Object.keys(files).forEach(k=>files[k]=null);listFiles();$("#nCnt").textContent="0 / 1200 (minimum 100)";["eSt","eCat","eNar","eDoc","eDec"].forEach(i=>$("#"+i).textContent="");$$(".invalid").forEach(x=>x.classList.remove("invalid"));},0);});
+$("#af").addEventListener("submit",e=>{e.preventDefault();const bad=[];
+ if(!err("eSt",$("#aSt").value?"":"Please select a station.",$("#aSt")))bad.push($("#aSt"));
+ if(!err("eCat",$("#aCat").value?"":"Please select an award category.",$("#aCat")))bad.push($("#aCat"));
+ const n=nar.value.trim().length;if(!err("eNar",n>=100?"":(n===0?"Please write the narrative.":"Narrative is too short: "+n+" of minimum 100 characters."),nar))bad.push(nar);
+ const fl=Object.values(files).filter(Boolean);let dm="";if(!fl.length)dm="Attach at least one supporting document.";else if(fl.some(x=>x.size>10*1048576))dm="Each file must be 10 MB or smaller.";
+ if(!err("eDoc",dm))bad.push($("#d1"));
+ if(!err("eDec",$("#aDec").checked?"":"You must accept the declaration to submit.",$("#aDec")))bad.push($("#aDec"));
+ if(bad.length){bad[0].focus();toast("Please fix "+bad.length+" highlighted field"+(bad.length>1?"s":"")+".");return;}
+ const list=store.get("awards_new",[]),id="A-"+(106+list.length),ref="NCRA-2026-"+String(1000+Math.floor(Math.random()*9000));
+ const rec={id,ref,station:$("#aSt").value,cat:$("#aCat").value,date:TODAY,status:"Submitted",docs:fl.length,narrative:nar.value.trim(),files:fl.map(x=>x.name)};
+ list.push(rec);store.set("awards_new",list);
+ $("#refNo").textContent=ref;$("#confDl").innerHTML='<dt>Station</dt><dd>'+esc(rec.station)+'</dd><dt>Category</dt><dd>'+esc(rec.cat)+'</dd><dt>Documents</dt><dd>'+rec.files.map(esc).join(", ")+'</dd><dt>Status</dt><dd><span class="chip b">Submitted</span></dd>';
+ $("#awForm").hidden=true;$("#awConf").hidden=false;$("#awConf").focus();renderAw();toast("Nomination submitted. Reference "+ref);});
+$("#another").onclick=()=>{$("#af").reset();$("#awConf").hidden=true;$("#awForm").hidden=false;$("#aSt").focus();};
+$("#toStatus").onclick=e=>{e.preventDefault();$("#awStatus").scrollIntoView({behavior:reduce?"auto":"smooth"});};
+renderAw();
+})();
+</script></body></html>

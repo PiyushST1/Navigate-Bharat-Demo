@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Watch video - NaViGate Bharat 2.0</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.crumb{font-size:.85rem;margin:18px 0 12px;color:var(--muted)}
+.crumb a{text-decoration:none;font-weight:600}.crumb a:hover{text-decoration:underline}
+.crumb span.sep{margin:0 6px}
+.vlay{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:22px;align-items:start}
+.player{position:relative;background:#000;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+.player video{display:block;width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,var(--c,#12355B),#0B1F3A)}
+.badge{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.72);color:#fff;font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;pointer-events:none}
+.buf{position:absolute;inset:0;display:none;place-items:center;background:rgba(0,0,0,.45);color:#fff;font-weight:700;pointer-events:none}
+.buf.on{display:grid}
+.ctl{display:flex;gap:14px;flex-wrap:wrap;align-items:end;margin:12px 0}
+.ctl div{min-width:140px}
+.ctl label{margin-top:0}
+.ctl select{width:auto;min-width:140px}
+h1.vt{font-size:1.6rem;margin:14px 0 8px}
+.vmeta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:.9rem}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+.sharebox{display:none;margin:0 0 14px}
+.sharebox.on{display:block}
+.sharebox .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sharebox input[readonly]{flex:1;min-width:180px}
+.tr-line{display:flex;gap:12px;padding:8px 6px;border-bottom:1px solid var(--line);border-radius:6px}
+.tr-line button{border:0;background:var(--soft);color:var(--blue);font-weight:700;border-radius:6px;padding:2px 9px;cursor:pointer;height:fit-content;font:inherit;font-weight:700;font-size:.85rem}
+.tr-line.act{background:#FFF3DF}
+body.hc .tr-line.act{background:#222}
+.rel .vcard{margin-bottom:14px}
+.dl-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.nf{text-align:center;padding:50px 20px}
+@media(max-width:900px){.vlay{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="wrap" id="main"><div id="root"></div></main>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+ADG.page({nav:"videos"});
+(function(){
+  const D=ADG.D, $=ADG.$, $$=ADG.$$, esc=ADG.esc, root=$("#root");
+  const id=parseInt(ADG.qs("id"),10), v=D.videos.find(x=>x.id===id);
+  if(!v){
+    document.title="Video not found - NaViGate Bharat 2.0";
+    root.innerHTML='<div class="card nf" style="margin-top:30px"><div style="font-size:3rem" aria-hidden="true">🎞️</div><h1>Video not found</h1><p class="muted">The video you are looking for does not exist or may have been removed.</p><a class="btn" href="search.html">Browse all videos</a> <a class="btn sec" href="index.html">Home</a></div>';
+    return;
+  }
+  document.title=v.title+" - NaViGate Bharat 2.0";
+  const cat=D.cats.find(c=>c.id===v.cat);
+
+  /* per-video view counter (persisted locally) */
+  const viewsKey="views_"+v.id; const extra=(ADG.store.get(viewsKey,0)||0)+1; ADG.store.set(viewsKey,extra);
+  const totalViews=v.views+extra;
+  const secs=(()=>{ const p=v.dur.split(":").map(Number); return p[0]*60+p[1]; })();
+
+  /* related: same category first, then same language, then most viewed; total 4 */
+  const rel=[]; const seen=new Set([v.id]);
+  const push=l=>l.forEach(x=>{ if(rel.length<4 && !seen.has(x.id)){ seen.add(x.id); rel.push(x); } });
+  push(D.videos.filter(x=>x.cat===v.cat)); push(D.videos.filter(x=>x.lang===v.lang)); push(D.videos.slice().sort((a,b)=>b.views-a.views));
+
+  const shareUrl=location.href;
+  const mmss=s=>String(Math.floor(s/60)).padStart(2,"0")+":"+String(Math.floor(s%60)).padStart(2,"0");
+  const lines=["Welcome. In this video we look at: "+v.title+".","First, a quick overview of who this is for and why it matters.","Here is how the process works in simple, practical steps.","Remember to keep your documents and mobile number handy.","Many people have already benefited, and here are a few stories.","If you face any difficulty, help desks and helplines are available.","Check eligibility and deadlines on the official channels before applying.","Thank you for watching. Share this video with family and friends."];
+  const tr=lines.map((t,i)=>({t:Math.round(i*secs/lines.length),x:t}));
+  const sizeMB=(q)=>{ const br={360:0.7,720:2.0,1080:4.5}[q]; return (br*secs/8).toFixed(1); };
+
+  root.innerHTML=
+  '<nav class="crumb" aria-label="Breadcrumb"><a href="index.html">Home</a><span class="sep">›</span><a href="search.html">Videos</a><span class="sep">›</span><a href="search.html?cat='+esc(v.cat)+'">'+esc(v.catName)+'</a><span class="sep">›</span><span aria-current="page">'+esc(v.title)+'</span></nav>'+
+  '<div class="vlay"><div>'+
+    '<div class="player" style="--c:'+v.color+'"><video id="vid" controls preload="metadata" playsinline aria-label="'+esc(v.title)+'"><source src="'+esc(v.src)+'" type="video/mp4">Your browser does not support HTML5 video.</video><span class="badge" id="qBadge" aria-live="polite">Adaptive streaming: 720p</span><div class="buf" id="buf" aria-hidden="true">Switching quality...</div></div>'+
+    '<div class="ctl"><div><label for="qSel">Quality</label><select id="qSel"><option value="auto">Auto</option><option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option><option value="360">360p</option></select></div>'+
+    '<div><label for="spSel">Playback speed</label><select id="spSel"><option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="1" selected>1x (Normal)</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option></select></div></div>'+
+    '<h1 class="vt">'+esc(v.title)+'</h1>'+
+    '<div class="vmeta"><span class="chip b">'+esc(v.catName)+'</span><span class="chip">'+esc(v.lang)+'</span><span class="chip">⏱ '+v.dur+'</span><span id="viewsTxt"><b>'+totalViews.toLocaleString("en-IN")+'</b> views</span><span>· Published '+v.date+'</span></div>'+
+    '<div class="acts"><button class="btn" type="button" id="shareBtn" aria-expanded="false" aria-controls="sharebox">🔗 Share</button><button class="btn sec" type="button" id="dlBtn">⬇ Download</button><a class="btn sec" href="search.html?cat='+esc(v.cat)+'">More in '+esc(v.catName)+'</a></div>'+
+    '<div class="card sharebox" id="sharebox"><h2 style="font-size:1.1rem">Share this video</h2><div class="row"><label for="shareUrl" style="position:absolute;left:-9999px">Video link</label><input type="text" id="shareUrl" readonly value="'+esc(shareUrl)+'"><button class="btn" type="button" id="copyBtn">Copy link</button></div>'+
+    '<div class="row" style="margin-top:10px"><a class="btn sec sm" id="shWa" target="_blank" rel="noopener">WhatsApp</a><a class="btn sec sm" id="shX" target="_blank" rel="noopener">X (Twitter)</a><a class="btn sec sm" id="shMail">Email</a></div></div>'+
+    '<div class="card" id="tabsHost"><div class="tabs"><button type="button" class="on" data-pane="pDesc">Description</button><button type="button" data-pane="pTr">Transcript</button><button type="button" data-pane="pAbout">About this video</button></div>'+
+      '<div class="pane on" id="pDesc"><p style="margin-top:0">'+esc(v.desc)+'</p><div>'+v.tags.map(t=>'<a class="chip" style="text-decoration:none" href="search.html?q='+encodeURIComponent(t)+'">#'+esc(t)+'</a>').join(" ")+'</div></div>'+
+      '<div class="pane" id="pTr"><p class="muted" style="margin-top:0">Sample transcript for demonstration. Select a timestamp to jump to that point.</p><div id="trList">'+tr.map((l,i)=>'<div class="tr-line" data-i="'+i+'"><button type="button" data-t="'+l.t+'" aria-label="Jump to '+mmss(l.t)+'">'+mmss(l.t)+'</button><span>'+esc(l.x)+'</span></div>').join("")+'</div></div>'+
+      '<div class="pane" id="pAbout"><table class="t"><tbody>'+
+        [["Title",v.title],["Category",v.catName+" ("+cat.hi+")"],["Language",v.lang],["Duration",v.dur],["Published",v.date],["Video ID","NVB-"+String(v.id).padStart(5,"0")],["Source","New Media Wing sample library"],["Accessibility","Captions and transcript available (sample)"],["Formats","MP4 (H.264), 360p to 1080p"]].map(r=>'<tr><th scope="row" style="width:34%;text-align:left;background:var(--soft);color:var(--ink);padding:9px 11px;font-size:.85rem">'+r[0]+'</th><td>'+esc(r[1])+'</td></tr>').join("")+'</tbody></table></div></div>'+
+  '</div>'+
+  '<aside class="rel" aria-label="Related videos"><h2 style="font-size:1.2rem">Related videos</h2>'+rel.map(x=>ADG.vcard(x)).join("")+'</aside></div>';
+
+  ADG.tabs($("#tabsHost").parentElement);
+
+  /* player controls */
+  const vid=$("#vid"), badge=$("#qBadge"), buf=$("#buf");
+  let curQ="720", bufT=null;
+  function setBadge(q,auto){ badge.textContent="Adaptive streaming: "+q+"p"+(auto?" (auto)":""); }
+  $("#qSel").addEventListener("change",e=>{
+    const val=e.target.value, was=!vid.paused, t=vid.currentTime;
+    const eff=val==="auto"?"720":val; buf.classList.add("on"); vid.pause();
+    clearTimeout(bufT);
+    bufT=setTimeout(()=>{ buf.classList.remove("on"); try{ vid.currentTime=t; }catch(_){} curQ=eff; setBadge(eff,val==="auto");
+      ADG.toast(val==="auto"?"Quality set to Auto (currently "+eff+"p)":"Switched to "+eff+"p"); if(was){ const p=vid.play(); if(p&&p.catch) p.catch(()=>{}); } },700);
+  });
+  $("#spSel").addEventListener("change",e=>{ vid.playbackRate=parseFloat(e.target.value); ADG.toast("Playback speed "+e.target.value+"x"); });
+  vid.addEventListener("ratechange",()=>{ const s=$("#spSel"); const r=String(vid.playbackRate); if([...s.options].some(o=>o.value===r)) s.value=r; });
+  vid.addEventListener("error",()=>{ if(!$("#vidErr")){ const d=document.createElement("div"); d.id="vidErr"; d.className="muted"; d.style.cssText="padding:8px 4px;font-size:.85rem"; d.setAttribute("role","alert"); d.textContent="This browser could not play the sample video file. The player controls remain available for the demo."; $(".player").after(d); } },true);
+  /* transcript seek + highlight */
+  $$("#trList button").forEach(b=>b.onclick=()=>{ const t=+b.dataset.t; try{ const max=isFinite(vid.duration)?vid.duration:Infinity; vid.currentTime=Math.min(t,Math.max(0,max-0.1)); }catch(_){} ADG.toast("Jumped to "+b.textContent); const pr=vid.play(); if(pr&&pr.catch) pr.catch(()=>{}); });
+  vid.addEventListener("timeupdate",()=>{ const d=isFinite(vid.duration)&&vid.duration>0?vid.duration:secs; const pos=vid.currentTime/d*secs; let a=0; tr.forEach((l,i)=>{ if(pos>=l.t) a=i; }); $$("#trList .tr-line").forEach((el,i)=>el.classList.toggle("act",i===a&&vid.currentTime>0)); });
+
+  /* share */
+  const txt=v.title+" - NaViGate Bharat 2.0 (demo)";
+  $("#shWa").href="https://wa.me/?text="+encodeURIComponent(txt+" "+shareUrl);
+  $("#shX").href="https://twitter.com/intent/tweet?text="+encodeURIComponent(txt)+"&url="+encodeURIComponent(shareUrl);
+  $("#shMail").href="mailto:?subject="+encodeURIComponent(txt)+"&body="+encodeURIComponent("Watch this video: "+shareUrl);
+  $("#shareBtn").onclick=function(){ const b=$("#sharebox"); const on=b.classList.toggle("on"); this.setAttribute("aria-expanded",on); if(on) $("#copyBtn").focus(); };
+  $("#copyBtn").onclick=()=>{
+    const inp=$("#shareUrl");
+    const fallback=()=>{ try{ inp.focus(); inp.select(); inp.setSelectionRange(0,99999); const ok=document.execCommand("copy"); ADG.toast(ok?"Link copied to clipboard":"Press Ctrl+C to copy the selected link"); }catch(e){ ADG.toast("Press Ctrl+C to copy the selected link"); } };
+    if(navigator.clipboard&&navigator.clipboard.writeText&&window.isSecureContext){ navigator.clipboard.writeText(shareUrl).then(()=>ADG.toast("Link copied to clipboard"),fallback); } else fallback();
+  };
+
+  /* download */
+  $("#dlBtn").onclick=()=>{
+    const m=ADG.modal('<h2 style="font-size:1.25rem">Download video</h2><p class="muted" style="margin-top:0">'+esc(v.title)+' · '+v.dur+'. Choose a quality. Sample file for demonstration.</p>'+
+      [360,720,1080].map(q=>'<div class="dl-row"><div><b>'+q+'p</b> <span class="muted">· MP4 · approx. '+sizeMB(q)+' MB</span></div><button type="button" class="btn sm" data-q="'+q+'">Download</button></div>').join("")+
+      '<div style="text-align:right;margin-top:16px"><button type="button" class="btn sec" data-close>Cancel</button></div>',
+      bg=>{ $$("[data-q]",bg).forEach(b=>b.onclick=()=>{ const q=b.dataset.q; bg.remove(); if(location.protocol!=="file:"){ const a=document.createElement("a"); a.href=v.src; a.download="navigate-bharat-"+v.id+"-"+q+"p.mp4"; document.body.appendChild(a); a.click(); a.remove(); } ADG.toast("Download started: "+q+"p ("+sizeMB(q)+" MB)"); }); const first=$("[data-q]",bg); if(first) first.focus();
+        bg.addEventListener("keydown",e=>{ if(e.key==="Escape") bg.remove(); }); });
+    return m;
+  };
+})();
+</script>
+</body>
+</html>
