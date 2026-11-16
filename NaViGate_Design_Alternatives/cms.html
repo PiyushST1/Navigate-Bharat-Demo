@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NaViGate Bharat CMS (Demonstration)</title>
+<style>
+:root{--bg:#F4F7FB;--card:#fff;--ink:#0B1F3A;--muted:#4A5B73;--line:#D5DDE8;--navy:#15233F;--accent:#12355B;--gold:#F5A524;--goldtxt:#B4570A;--teal:#0A7A70;--red:#B3261E;--green:#1B7F3B}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Calibri,"Segoe UI",system-ui,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{font-family:Cambria,Georgia,serif;margin:0}
+.demo{background:var(--gold);color:#1A1100;text-align:center;font-weight:700;font-size:.8rem;padding:.35rem 1rem}
+.top{background:var(--navy);color:#fff;display:flex;flex-wrap:wrap;gap:.6rem 1.2rem;align-items:center;justify-content:space-between;padding:.7rem clamp(16px,3vw,32px)}
+.top .brand{font:700 1.3rem Cambria,Georgia,serif}.top .brand b{color:var(--gold)}.top .brand small{font:600 .75rem Calibri,sans-serif;background:#2EC4B6;color:#032B28;border-radius:4px;padding:.1rem .4rem;margin-left:.4rem;vertical-align:.3em}
+.who{display:flex;gap:.7rem;align-items:center;font-size:.9rem}
+.role{background:var(--gold);color:#1A1100;border-radius:999px;padding:.1rem .7rem;font-weight:800;font-size:.78rem}
+.btn{border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:8px;padding:.4rem .9rem;font-weight:700;cursor:pointer}
+.btn:hover{background:#EAF0F8}.btn.pri{background:var(--accent);color:#fff}.btn.pri:hover{filter:brightness(1.15)}
+.btn.ok{background:var(--green);border-color:var(--green);color:#fff}.btn.bad{background:#fff;border-color:var(--red);color:var(--red)}
+.btn.sm{padding:.2rem .6rem;font-size:.84rem}.btn:disabled{opacity:.4;cursor:not-allowed}
+.top .btn{background:transparent;border-color:rgba(255,255,255,.5);color:#fff}
+nav{background:#fff;border-bottom:1px solid var(--line);display:flex;gap:.2rem;flex-wrap:wrap;padding:0 clamp(16px,3vw,32px)}
+nav button{background:none;border:0;border-bottom:3px solid transparent;padding:.8rem 1rem;font-weight:700;cursor:pointer;color:var(--muted)}
+nav button[aria-selected=true]{color:var(--accent);border-bottom-color:var(--gold)}
+main{padding:1.4rem clamp(16px,3vw,32px) 3rem;max-width:1200px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1rem;margin:1rem 0 1.5rem}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem}
+.stat b{display:block;font:700 2rem Cambria,Georgia,serif}.stat span{color:var(--muted);font-weight:700}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem;margin-bottom:1.2rem}
+.panel h2{font-size:1.2rem;margin-bottom:.6rem}
+.bar{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;justify-content:space-between;margin-bottom:.8rem}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:640px}
+th,td{text-align:left;padding:.55rem .6rem;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:.76rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pill{display:inline-block;border-radius:999px;padding:.05rem .6rem;font-weight:800;font-size:.76rem;border:1px solid}
+.s-Draft{color:#555;background:#eee;border-color:#ccc}.s-Pending{color:#8A5200;background:#FFF1D6;border-color:#F0C777}.s-Published{color:var(--green);background:#E3F5E8;border-color:#9AD3AB}.s-Rejected{color:var(--red);background:#FCE8E6;border-color:#F0AFAA}
+.acts{display:flex;gap:.3rem;flex-wrap:wrap}
+input,select,textarea{border:1px solid #9FB0C6;border-radius:8px;padding:.5rem .6rem;background:#fff;width:100%}
+label{display:block;font-weight:700;font-size:.85rem;margin:.7rem 0 .25rem}
+.note{color:var(--muted);font-size:.85rem}
+dialog{border:0;border-radius:14px;padding:1.3rem;width:min(94vw,460px);box-shadow:0 24px 60px rgba(2,6,16,.45);color:var(--ink)}
+dialog::backdrop{background:rgba(2,6,16,.6)}
+.row{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1rem}
+.login{max-width:420px;margin:8vh auto;background:#fff;border:1px solid var(--line);border-radius:16px;padding:1.6rem;box-shadow:0 18px 46px rgba(11,31,58,.12)}
+.perm td:nth-child(n+2),.perm th:nth-child(n+2){text-align:center}
+.yes{color:var(--green);font-weight:800}.no{color:#9AA7B8}
+.toast{position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);background:var(--navy);color:#fff;border:2px solid var(--gold);border-radius:10px;padding:.6rem 1rem;z-index:50}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+:focus-visible{outline:3px solid #0B5FFF;outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="demo">DEMONSTRATION PROTOTYPE | Sample data only, saved in this browser. No real authentication | Not the official NaViGate Bharat portal</div>
+<div id="app"></div>
+<dialog id="dlg"></dialog>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script>
+(function(){
+var ROLES=['Superadmin','Admin','Content Editor','Approver'];
+/* what each role may do */
+var P={
+ 'Superadmin':{create:1,edit:1,submit:1,review:1,publish:1,del:1,users:1,roles:1,audit:1,settings:1},
+ 'Admin':{create:1,edit:1,submit:1,review:1,publish:1,del:1,users:1,roles:0,audit:1,settings:0},
+ 'Content Editor':{create:1,edit:1,submit:1,review:0,publish:0,del:0,users:0,roles:0,audit:0,settings:0},
+ 'Approver':{create:0,edit:0,submit:0,review:1,publish:1,del:0,users:0,roles:0,audit:1,settings:0}
+};
+var KEY='nb_cms_v1',SKEY='nb_cms_session';
+var CATS=['Government Schemes','Health & Wellness','Education & Skills','Agriculture','Culture & Heritage','Digital India','Women & Child','Environment'];
+var LANGS=['English','Hindi','Tamil','Bengali','Marathi'];
+function seed(){return{
+ videos:[
+  {id:1,title:'How the Digital Literacy Mission reaches villages',cat:'Digital India',lang:'Hindi',status:'Published',author:'Meera Iyer',upd:'2026-11-10'},
+  {id:2,title:'Kathak: the story in every step',cat:'Culture & Heritage',lang:'English',status:'Published',author:'Rahul Verma',upd:'2026-11-08'},
+  {id:3,title:'Smart farming with soil health cards',cat:'Agriculture',lang:'Marathi',status:'Pending',author:'Meera Iyer',upd:'2026-11-14'},
+  {id:4,title:'Skill India: your first certificate',cat:'Education & Skills',lang:'Tamil',status:'Pending',author:'Rahul Verma',upd:'2026-11-15'},
+  {id:5,title:'Clean river initiative: a ground report',cat:'Environment',lang:'Bengali',status:'Draft',author:'Meera Iyer',upd:'2026-11-12'},
+  {id:6,title:'Vaccination drive explained',cat:'Health & Wellness',lang:'Hindi',status:'Rejected',author:'Rahul Verma',upd:'2026-11-05'}
+ ],
+ users:[
+  {id:1,name:'Piyush Tiwari',email:'superadmin@demo.test',role:'Superadmin',active:true},
+  {id:2,name:'Anita Desai',email:'admin@demo.test',role:'Admin',active:true},
+  {id:3,name:'Meera Iyer',email:'editor1@demo.test',role:'Content Editor',active:true},
+  {id:4,name:'Rahul Verma',email:'editor2@demo.test',role:'Content Editor',active:true},
+  {id:5,name:'Kabir Shah',email:'approver@demo.test',role:'Approver',active:true}
+ ],
+ log:[],maint:false,nid:{v:7,u:6}
+}}
+var D;try{D=JSON.parse(localStorage.getItem(KEY))}catch(e){}if(!D||!D.videos)D=seed();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){}}
+var S=null;try{S=JSON.parse(localStorage.getItem(SKEY))}catch(e){}
+var view='dash';
+function $(s,r){return(r||document).querySelector(s)}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function can(a){return S&&P[S.role]&&P[S.role][a]}
+function today(){return new Date().toISOString().slice(0,10)}
+function log(a){D.log.unshift({t:new Date().toLocaleString(),who:S.name+' ('+S.role+')',a:a});D.log=D.log.slice(0,200);save()}
+function toast(m){var t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(function(){t.hidden=true},2400)}
+
+/* ---------- login ---------- */
+function renderLogin(){
+  $('#app').innerHTML='<div class="login"><h1>NaViGate CMS</h1><p class="note">Demonstration sign-in. Pick a demo account; any password works.</p>'+
+  '<label for="lr">Demo account</label><select id="lr">'+D.users.filter(function(u){return u.active}).map(function(u){return '<option value="'+u.id+'">'+esc(u.name)+' ('+esc(u.role)+')</option>'}).join('')+'</select>'+
+  '<label for="lp">Password</label><input id="lp" type="password" placeholder="any value">'+
+  '<label for="lq">Security check: <span id="qa"></span></label><input id="lq" inputmode="numeric" autocomplete="off">'+
+  '<div class="row"><button class="btn pri" id="lg">Sign in</button></div><p class="note" id="le" role="alert" style="color:var(--red)"></p></div>';
+  var a=2+Math.floor(Math.random()*7),b=2+Math.floor(Math.random()*7);$('#qa').textContent=a+' + '+b+' = ?';
+  var pre=localStorage.getItem('nb_cms_prefill');if(pre){var o=[].slice.call($('#lr').options).filter(function(x){return D.users.find(function(u){return u.id==x.value&&u.role===pre})})[0];if(o)$('#lr').value=o.value;localStorage.removeItem('nb_cms_prefill')}
+  function go(){if(+$('#lq').value!==a+b){$('#le').textContent='Wrong answer to the security check. Try again.';return}
+    var u=D.users.find(function(x){return x.id==$('#lr').value});S={id:u.id,name:u.name,role:u.role};
+    try{localStorage.setItem(SKEY,JSON.stringify(S))}catch(e){}log('Signed in');render()}
+  $('#lg').onclick=go;$('#lq').onkeydown=function(e){if(e.key==='Enter')go()};
+}
+
+/* ---------- shell ---------- */
+function tabs(){var t=[['dash','Dashboard'],['videos','Videos'],['appr','Approvals']];
+  if(can('users'))t.push(['users','Users']);if(can('audit'))t.push(['audit','Audit log']);
+  t.push(['perm','Roles & permissions']);if(can('settings'))t.push(['set','Settings']);return t}
+function render(){
+  if(!S||!P[S.role]){renderLogin();return}
+  if(!tabs().some(function(t){return t[0]===view}))view='dash';
+  $('#app').innerHTML='<header class="top"><div class="brand">NaViGate <b>Bharat</b><small>CMS</small></div><div class="who"><span>'+esc(S.name)+'</span><span class="role">'+esc(S.role)+'</span><button class="btn sm" id="out">Sign out</button></div></header>'+
+  '<nav role="tablist" aria-label="CMS sections">'+tabs().map(function(t){return '<button role="tab" data-v="'+t[0]+'" aria-selected="'+(t[0]===view)+'">'+t[1]+'</button>'}).join('')+'</nav><main id="main"></main>';
+  $('#out').onclick=function(){log('Signed out');S=null;try{localStorage.removeItem(SKEY)}catch(e){}render()};
+  [].forEach.call(document.querySelectorAll('nav [data-v]'),function(b){b.onclick=function(){view=b.dataset.v;render()}});
+  ({dash:vDash,videos:vVideos,appr:vAppr,users:vUsers,audit:vAudit,perm:vPerm,set:vSet})[view]();
+}
+function count(s){return D.videos.filter(function(v){return v.status===s}).length}
+
+/* ---------- views ---------- */
+function vDash(){
+  $('#main').innerHTML='<h2>Welcome, '+esc(S.name.split(' ')[0])+'</h2><p class="note">Signed in as '+esc(S.role)+'. Sections you can use appear in the tabs above.</p>'+
+  '<div class="grid"><div class="stat"><b>'+D.videos.length+'</b><span>Total videos</span></div><div class="stat"><b>'+count('Published')+'</b><span>Published</span></div><div class="stat"><b>'+count('Pending')+'</b><span>Awaiting approval</span></div><div class="stat"><b>'+count('Draft')+'</b><span>Drafts</span></div><div class="stat"><b>'+D.users.filter(function(u){return u.active}).length+'</b><span>Active users</span></div></div>'+
+  (can('review')&&count('Pending')?'<div class="panel"><h2>Needs your review</h2><p>'+count('Pending')+' video(s) are waiting. <button class="btn sm pri" id="gA">Open approvals</button></p></div>':'')+
+  (can('create')?'<div class="panel"><h2>Quick action</h2><button class="btn pri" id="gN">New video</button></div>':'')+
+  (D.maint?'<div class="panel" style="border-color:var(--gold)"><b>Maintenance banner is ON</b> for the public portal (set by Superadmin).</div>':'');
+  var a=$('#gA');if(a)a.onclick=function(){view='appr';render()};var n=$('#gN');if(n)n.onclick=function(){editVideo()};
+}
+function vidRow(v,full){
+  var a='';
+  if(can('edit')&&(v.status==='Draft'||v.status==='Rejected'||can('review')&&can('publish')&&S.role!=='Approver'))a+='<button class="btn sm" data-e="'+v.id+'">Edit</button>';
+  if(can('submit')&&(v.status==='Draft'||v.status==='Rejected'))a+='<button class="btn sm pri" data-s="'+v.id+'">Submit</button>';
+  if(can('review')&&v.status==='Pending')a+='<button class="btn sm ok" data-a="'+v.id+'">Approve</button><button class="btn sm bad" data-r="'+v.id+'">Reject</button>';
+  if(can('publish')&&v.status==='Published'&&S.role!=='Approver')a+='<button class="btn sm" data-u="'+v.id+'">Unpublish</button>';
+  if(can('del'))a+='<button class="btn sm bad" data-d="'+v.id+'">Delete</button>';
+  return '<tr><td><b>'+esc(v.title)+'</b>'+(v.note?'<div class="note">Reviewer note: '+esc(v.note)+'</div>':'')+'</td>'+(full?'<td>'+esc(v.cat)+'</td><td>'+esc(v.lang)+'</td>':'')+'<td><span class="pill s-'+v.status+'">'+v.status+'</span></td><td>'+esc(v.author)+'<div class="note">'+v.upd+'</div></td><td><div class="acts">'+(a||'<span class="note">View only</span>')+'</div></td></tr>'
+}
+function bindVid(){
+  function by(attr,fn){[].forEach.call(document.querySelectorAll('['+attr+']'),function(b){b.onclick=function(){fn(D.videos.find(function(v){return v.id==b.getAttribute(attr)}))}})}
+  by('data-e',function(v){editVideo(v)});
+  by('data-s',function(v){v.status='Pending';v.upd=today();delete v.note;log('Submitted for approval: '+v.title);save();toast('Submitted for approval');render()});
+  by('data-a',function(v){v.status='Published';v.upd=today();delete v.note;log('Approved and published: '+v.title);save();toast('Published');render()});
+  by('data-r',function(v){ask('Reject video','<label for="rn">Reason for rejection</label><textarea id="rn" rows="3"></textarea>','Reject',function(){v.status='Rejected';v.note=$('#rn').value||'No reason given';v.upd=today();log('Rejected: '+v.title);save();toast('Rejected');render()})});
+  by('data-u',function(v){v.status='Draft';v.upd=today();log('Unpublished: '+v.title);save();toast('Moved to Draft');render()});
+  by('data-d',function(v){ask('Delete video','<p>Delete “'+esc(v.title)+'”? This cannot be undone.</p>','Delete',function(){D.videos=D.videos.filter(function(x){return x!==v});log('Deleted: '+v.title);save();toast('Deleted');render()})});
+}
+function vVideos(){
+  $('#main').innerHTML='<div class="bar"><h2>Videos</h2>'+(can('create')?'<button class="btn pri" id="nv">New video</button>':'')+'</div><div class="panel"><div class="bar"><input id="q" placeholder="Search title" aria-label="Search title" style="max-width:260px"><select id="fs" aria-label="Filter by status" style="max-width:180px"><option value="">All statuses</option><option>Draft</option><option>Pending</option><option>Published</option><option>Rejected</option></select></div><div class="tw"><table><thead><tr><th>Title</th><th>Category</th><th>Language</th><th>Status</th><th>Author</th><th>Actions</th></tr></thead><tbody id="tb"></tbody></table></div></div>';
+  function draw(){var q=$('#q').value.toLowerCase(),s=$('#fs').value;$('#tb').innerHTML=D.videos.filter(function(v){return(!q||v.title.toLowerCase().indexOf(q)>-1)&&(!s||v.status===s)}).map(function(v){return vidRow(v,true)}).join('')||'<tr><td colspan="6" class="note">No videos match.</td></tr>';bindVid()}
+  $('#q').oninput=draw;$('#fs').onchange=draw;draw();var n=$('#nv');if(n)n.onclick=function(){editVideo()};
+}
+function vAppr(){
+  var p=D.videos.filter(function(v){return v.status==='Pending'});
+  $('#main').innerHTML='<h2>Approvals</h2><div class="panel">'+(p.length?'<div class="tw"><table><thead><tr><th>Title</th><th>Status</th><th>Author</th><th>Actions</th></tr></thead><tbody>'+p.map(function(v){return vidRow(v,false)}).join('')+'</tbody></table></div>':'<p class="note">Nothing is waiting for approval.</p>')+'</div>'+(can('review')?'':'<p class="note">Only Approvers, Admins and Superadmins can approve or reject.</p>');
+  bindVid();
+}
+function editVideo(v){
+  if(!can('create')&&!v)return;
+  var nv=!v;v=v||{title:'',cat:CATS[0],lang:LANGS[0]};
+  ask(nv?'New video':'Edit video','<label for="et">Title</label><input id="et" value="'+esc(v.title)+'"><label for="ec">Category</label><select id="ec">'+CATS.map(function(c){return '<option'+(c===v.cat?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select><label for="el">Language</label><select id="el">'+LANGS.map(function(c){return '<option'+(c===v.lang?' selected':'')+'>'+c+'</option>'}).join('')+'</select>','Save',function(){
+    var t=$('#et').value.trim();if(!t){toast('Title is required');return false}
+    if(nv){D.videos.unshift({id:D.nid.v++,title:t,cat:$('#ec').value,lang:$('#el').value,status:'Draft',author:S.name,upd:today()});log('Created draft: '+t)}
+    else{v.title=t;v.cat=$('#ec').value;v.lang=$('#el').value;v.upd=today();log('Edited: '+t)}
+    save();toast('Saved');render()});
+}
+function vUsers(){
+  $('#main').innerHTML='<div class="bar"><h2>Users</h2><button class="btn pri" id="nu">Add user</button></div><div class="panel"><div class="tw"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+
+  D.users.map(function(u){var locked=u.role==='Superadmin'&&!can('roles'),self=u.id===S.id;
+   var rs=can('roles')&&!self?'<select data-r="'+u.id+'" aria-label="Role for '+esc(u.name)+'">'+ROLES.map(function(r){return '<option'+(r===u.role?' selected':'')+'>'+r+'</option>'}).join('')+'</select>':esc(u.role);
+   return '<tr><td><b>'+esc(u.name)+'</b>'+(self?' <span class="note">(you)</span>':'')+'</td><td>'+esc(u.email)+'</td><td>'+rs+'</td><td>'+(u.active?'<span class="pill s-Published">Active</span>':'<span class="pill s-Draft">Disabled</span>')+'</td><td>'+(locked||self?'<span class="note">'+(self?'Your account':'Superadmin only')+'</span>':'<button class="btn sm" data-t="'+u.id+'">'+(u.active?'Disable':'Enable')+'</button>')+'</td></tr>'}).join('')+'</tbody></table></div></div>'+
+  (can('roles')?'<p class="note">Superadmin can change any role. Admins can add Editors and Approvers and enable or disable them, but cannot change roles or touch Superadmin accounts.</p>':'');
+  $('#nu').onclick=function(){var rl=can('roles')?ROLES:['Content Editor','Approver'];
+    ask('Add user','<label for="un">Name</label><input id="un"><label for="ue">Email</label><input id="ue" type="email"><label for="ur">Role</label><select id="ur">'+rl.map(function(r){return '<option>'+r+'</option>'}).join('')+'</select>','Add',function(){
+      var n=$('#un').value.trim(),e=$('#ue').value.trim();if(!n||!e){toast('Name and email are required');return false}
+      D.users.push({id:D.nid.u++,name:n,email:e,role:$('#ur').value,active:true});log('Added user: '+n+' as '+$('#ur').value);save();toast('User added');render()})};
+  [].forEach.call(document.querySelectorAll('[data-t]'),function(b){b.onclick=function(){var u=D.users.find(function(x){return x.id==b.dataset.t});u.active=!u.active;log((u.active?'Enabled':'Disabled')+' user: '+u.name);save();render()}});
+  [].forEach.call(document.querySelectorAll('[data-r]'),function(s){s.onchange=function(){var u=D.users.find(function(x){return x.id==s.dataset.r});log('Changed role of '+u.name+': '+u.role+' to '+s.value);u.role=s.value;save();toast('Role updated');render()}});
+}
+function vAudit(){
+  $('#main').innerHTML='<h2>Audit log</h2><div class="panel"><div class="tw"><table><thead><tr><th>When</th><th>Who</th><th>Action</th></tr></thead><tbody>'+(D.log.map(function(l){return '<tr><td>'+esc(l.t)+'</td><td>'+esc(l.who)+'</td><td>'+esc(l.a)+'</td></tr>'}).join('')||'<tr><td colspan="3" class="note">No activity yet.</td></tr>')+'</tbody></table></div></div>';
+}
+function vPerm(){
+  var rows=[['Create and edit drafts','create'],['Submit for approval','submit'],['Approve or reject','review'],['Publish or unpublish','publish'],['Delete videos','del'],['Manage users','users'],['Change roles','roles'],['View audit log','audit'],['System settings','settings']];
+  $('#main').innerHTML='<h2>Roles &amp; permissions</h2><div class="panel"><div class="tw"><table class="perm"><thead><tr><th>Capability</th>'+ROLES.map(function(r){return '<th>'+r+'</th>'}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr><td>'+r[0]+'</td>'+ROLES.map(function(x){return P[x][r[1]]?'<td class="yes" aria-label="Allowed">&#10003;</td>':'<td class="no" aria-label="Not allowed">&ndash;</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div></div>';
+}
+function vSet(){
+  $('#main').innerHTML='<h2>Settings <span class="role">Superadmin only</span></h2><div class="panel"><h2>Public portal</h2><label><input type="checkbox" id="mt" style="width:auto"'+(D.maint?' checked':'')+'> Show maintenance banner on the public portal</label></div><div class="panel"><h2>Demo data</h2><p class="note">Reset videos, users and the audit log to the starting sample data.</p><button class="btn bad" id="rs">Reset demo data</button></div>';
+  $('#mt').onchange=function(){D.maint=$('#mt').checked;log('Maintenance banner '+(D.maint?'on':'off'));save();toast('Saved')};
+  $('#rs').onclick=function(){ask('Reset demo data','<p>This restores the sample data and signs everyone out.</p>','Reset',function(){D=seed();save();S=null;try{localStorage.removeItem(SKEY)}catch(e){}render()})};
+}
+
+/* ---------- dialog helper ---------- */
+function ask(title,body,okLabel,fn){
+  var d=$('#dlg');d.innerHTML='<h2>'+esc(title)+'</h2>'+body+'<div class="row"><button class="btn" id="dx">Cancel</button><button class="btn pri" id="dok">'+esc(okLabel)+'</button></div>';
+  d.showModal();$('#dx').onclick=function(){d.close()};$('#dok').onclick=function(){if(fn()!==false)d.close()};
+}
+render();
+})();
+</script>
+</body>
+</html>
