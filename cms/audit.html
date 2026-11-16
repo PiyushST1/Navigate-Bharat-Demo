@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Audit log · NaViGate CMS</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.fl{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:0 14px;align-items:end}
+.fl>div{min-width:0}
+.dg{display:grid;gap:18px;grid-template-columns:2fr 1fr;margin-bottom:18px}@media(max-width:900px){.dg{grid-template-columns:1fr}}
+th button.sortb{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:center;font-weight:700;font-size:.82rem;color:#fff}
+th button.sortb:focus-visible{outline:3px solid var(--saffron);outline-offset:2px}
+.pg{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:12px}
+.pg .pn{display:flex;gap:6px;flex-wrap:wrap}
+.pg button[aria-current=page]{background:var(--saffron);color:#0B1F3A}
+.rs{list-style:none;margin:8px 0 0;padding:0;display:flex;gap:8px;flex-wrap:wrap}
+</style></head>
+<body>
+<div id="top"></div>
+<div id="app"></div>
+<script src="../assets/js/data.js"></script><script src="../assets/js/app.js"></script><script src="core-lib.js"></script>
+<script>
+document.getElementById("top").innerHTML=ADG.topbar("Audit log","Every state-changing action in the CMS, with who, when and why");
+ADG.admin({active:"audit"});
+(function(){
+  const A=ADG,C=CORE,$=A.$,esc=A.esc;
+  const me=C.user(), app=$("#app");
+  if(!A.can("audit.view")){
+    app.innerHTML='<section class="card" role="alert" aria-labelledby="adT" style="max-width:640px"><h2 id="adT" style="font-size:1.3rem">Access denied</h2><p>The audit log is available to the <b>Approver</b> and <b>Super Admin</b> roles. You are signed in as <b>'+esc(me.role||"unknown")+'</b>, which does not include the permission to view the audit log.</p><p><a class="btn" href="dashboard.html">Back to dashboard</a></p></section>';
+    return;
+  }
+  const PER=15, MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const RCHIP={"Super Admin":"b","Inputter":"o","Approver":"g"};
+  const COLS=[["t","Time"],["actor","Actor"],["role","Role"],["action","Action"],["item","Item"],["note","Comment"]];
+  function parseAt(s){ const m=/^(\d{1,2}) (\w{3}) (\d{4}),? (\d{1,2}):(\d{2})/.exec(String(s||"")); if(!m) return 0; return new Date(+m[3],MON.indexOf(m[2]),+m[1],+m[4],+m[5]).getTime()||0; }
+  function ymd(ts){ if(!ts) return ""; const d=new Date(ts),p=n=>(n<10?"0":"")+n; return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate()); }
+  let all=[], rows=[], page=1, sort={k:"t",dir:-1};
+
+  app.innerHTML=
+   '<div class="note" role="note" style="margin-bottom:16px"><b>'+esc(me.role)+'.</b> You can search, filter and export the audit log. It is read-only: you cannot edit or delete entries.</div>'+
+   '<section class="card" aria-labelledby="fT" style="margin-bottom:18px"><h2 id="fT" style="font-size:1.1rem">Filters</h2><form id="ff" class="fl" role="search" aria-label="Audit log filters" onsubmit="return false">'+
+   '<div><label for="fQ">Search</label><input type="search" id="fQ" placeholder="Actor, action, item or comment"></div>'+
+   '<div><label for="fA">Actor</label><select id="fA"><option value="">All actors</option></select></div>'+
+   '<div><label for="fR">Role</label><select id="fR"><option value="">All roles</option></select></div>'+
+   '<div><label for="fX">Action</label><select id="fX"><option value="">All actions</option></select></div>'+
+   '<div><label for="fF">Date from</label><input type="date" id="fF"></div>'+
+   '<div><label for="fT2">Date to</label><input type="date" id="fT2"></div>'+
+   '<div><button type="button" class="btn sec" id="fClr">Clear filters</button></div></form><div class="ferr" id="fErr" role="alert"></div></section>'+
+   '<div class="dg"><section class="card" aria-labelledby="sT"><h2 id="sT" style="font-size:1.1rem">Actions by role</h2><div class="muted" style="font-size:.82rem">For the entries that match the filters</div><div id="chart"></div><ul class="rs" id="rs"></ul></section>'+
+   '<section class="card" aria-labelledby="tT"><h2 id="tT" style="font-size:1.1rem">Top actions</h2><div class="muted" style="font-size:.82rem;margin-bottom:8px">For the entries that match the filters</div><div id="topA"></div></section></div>'+
+   '<section class="card" aria-labelledby="lT"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px"><div><h2 id="lT" style="font-size:1.2rem;margin:0">Audit trail</h2><div class="muted" id="cnt" aria-live="polite" style="font-size:.85rem"></div></div><button class="btn" id="exp">Export CSV</button></div>'+
+   '<div class="tbl-wrap"><table class="t" aria-label="Audit trail"><thead><tr id="hd"></tr></thead><tbody id="rows"></tbody></table></div><nav class="pg" id="pg" aria-label="Audit log pages"></nav></section>';
+
+  function opts(sel,vals,first){ sel.innerHTML='<option value="">'+first+'</option>'+vals.map(v=>'<option>'+esc(v)+'</option>').join(""); }
+  function loadAll(keep){
+    all=C.auditList().map((e,i)=>({i:i,ts:parseAt(e.at),at:e.at||"",actor:e.actor||"",role:e.role||"",action:e.action||"",item:e.item||"",note:e.note||""}));
+    const uniq=k=>[...new Set(all.map(e=>e[k]).filter(Boolean))].sort();
+    [["#fA","actor","All actors"],["#fR","role","All roles"],["#fX","action","All actions"]].forEach(a=>{ const s=$(a[0]),v=s.value; opts(s,uniq(a[1]),a[2]); if(keep) s.value=v; });
+  }
+  function filtered(){
+    const q=$("#fQ").value.trim().toLowerCase(), a=$("#fA").value, r=$("#fR").value, x=$("#fX").value, f=$("#fF").value, t=$("#fT2").value;
+    return all.filter(e=>(!a||e.actor===a)&&(!r||e.role===r)&&(!x||e.action===x)&&(!f||ymd(e.ts)>=f)&&(!t||ymd(e.ts)<=t)&&(!q||(e.actor+" "+e.role+" "+e.action+" "+e.item+" "+e.note+" "+e.at).toLowerCase().includes(q)));
+  }
+  function cmp(a,b){
+    let c;
+    if(sort.k==="t") c=a.ts-b.ts||(b.i-a.i);   /* equal timestamps: lower index is newer */
+    else c=String(a[sort.k]).localeCompare(String(b[sort.k]),undefined,{sensitivity:"base"})||(b.i-a.i);
+    return c*sort.dir;
+  }
+  function head(){
+    $("#hd").innerHTML=COLS.map(c=>{ const on=sort.k===c[0]; return '<th scope="col" aria-sort="'+(on?(sort.dir>0?"ascending":"descending"):"none")+'"><button type="button" class="sortb" data-sort="'+c[0]+'" aria-label="Sort by '+c[1]+(on?(sort.dir>0?", currently ascending":", currently descending"):"")+'">'+c[1]+'<span aria-hidden="true">'+(on?(sort.dir>0?"▲":"▼"):"↕")+'</span></button></th>'; }).join("");
+  }
+  function summary(){
+    const roles=["Super Admin","Inputter","Approver"].concat([...new Set(rows.map(e=>e.role).filter(r=>r&&["Super Admin","Inputter","Approver"].indexOf(r)<0))]);
+    const vals=roles.map(r=>rows.filter(e=>e.role===r).length);
+    A.bars($("#chart"),roles,vals,{h:200,max:Math.max(4,...vals)*1.1,color:"#2F6DB5",yfmt:v=>Math.round(v),label:"Audit entries by role"});
+    $("#rs").innerHTML=roles.map((r,i)=>'<li><span class="chip '+(RCHIP[r]||"")+'">'+esc(r)+': '+vals[i]+'</span></li>').join("");
+    const m={}; rows.forEach(e=>{ m[e.action]=(m[e.action]||0)+1; });
+    const top=Object.keys(m).sort((a,b)=>m[b]-m[a]||a.localeCompare(b)).slice(0,6);
+    $("#topA").innerHTML=top.length?'<ul class="rs" style="flex-direction:column;gap:6px">'+top.map(k=>'<li style="display:flex;justify-content:space-between;gap:8px;font-size:.88rem"><span>'+esc(k)+'</span><b>'+m[k]+'</b></li>').join("")+'</ul>':'<div class="muted">No entries.</div>';
+  }
+  function render(){
+    const f=$("#fF").value,t=$("#fT2").value, er=$("#fErr");
+    if(f&&t&&f>t){ er.textContent="The From date must be on or before the To date."; $("#fT2").classList.add("invalid"); rows=[]; }
+    else { er.textContent=""; $("#fT2").classList.remove("invalid"); rows=filtered().sort(cmp); }
+    const pages=Math.max(1,Math.ceil(rows.length/PER)); if(page>pages) page=pages; if(page<1) page=1;
+    const s=(page-1)*PER, slice=rows.slice(s,s+PER);
+    head(); summary();
+    $("#cnt").textContent=rows.length?"Showing "+(s+1)+"–"+(s+slice.length)+" of "+rows.length+" entr"+(rows.length===1?"y":"ies")+(rows.length!==all.length?" (filtered from "+all.length+")":""):"0 of "+all.length+" entries";
+    $("#rows").innerHTML=slice.length?slice.map(e=>'<tr><td style="white-space:nowrap">'+esc(e.at)+'</td><td>'+esc(e.actor)+'</td><td><span class="chip '+(RCHIP[e.role]||"")+'">'+esc(e.role)+'</span></td><td>'+esc(e.action)+'</td><td>'+esc(e.item)+'</td><td>'+(e.note?esc(e.note):'<span class="muted">—</span>')+'</td></tr>').join(""):'<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">No audit entries match these filters.</td></tr>';
+    let pn='<button type="button" class="btn sec sm" data-pg="prev"'+(page<=1?' disabled aria-disabled="true"':'')+'>Previous</button>';
+    for(let p=1;p<=pages;p++) pn+='<button type="button" class="btn sec sm" data-pg="'+p+'" aria-label="Page '+p+'"'+(p===page?' aria-current="page"':'')+'>'+p+'</button>';
+    pn+='<button type="button" class="btn sec sm" data-pg="next"'+(page>=pages?' disabled aria-disabled="true"':'')+'>Next</button>';
+    $("#pg").innerHTML='<span class="muted" style="font-size:.85rem">Page '+page+' of '+pages+' · '+PER+' per page</span><div class="pn">'+pn+'</div>';
+    const ex=$("#exp"); ex.disabled=!rows.length; ex.setAttribute("aria-disabled",!rows.length); ex.title=rows.length?"Download the "+rows.length+" matching entries as CSV":"No entries to export";
+  }
+  const safe=v=>{ v=String(v==null?"":v); if(/^[=+\-@\t\r]/.test(v)) v="'"+v; return '"'+v.replace(/"/g,'""')+'"'; };
+  function exportCsv(){
+    if(!A.can("audit.view")||!rows.length) return;
+    const lines=[["Time","Actor","Role","Action","Item","Comment"]].concat(rows.map(e=>[e.at,e.actor,e.role,e.action,e.item,e.note]));
+    C.download("audit_log_"+C.isoDate()+".csv","﻿"+lines.map(r=>r.map(safe).join(",")).join("\r\n"),"text/csv;charset=utf-8");
+    const n=rows.length;
+    C.audit("Exported","Audit log","CSV with "+n+" entr"+(n===1?"y":"ies"));
+    loadAll(true); render(); A.toast("Exported "+n+" audit entries to CSV");
+  }
+
+  ["fA","fR","fX","fF","fT2"].forEach(i=>$("#"+i).onchange=()=>{ page=1; render(); });
+  $("#fQ").oninput=()=>{ page=1; render(); };
+  $("#fClr").onclick=()=>{ ["fQ","fA","fR","fX","fF","fT2"].forEach(i=>$("#"+i).value=""); page=1; render(); $("#fQ").focus(); };
+  $("#exp").onclick=exportCsv;
+  app.addEventListener("click",ev=>{
+    const s=ev.target.closest("[data-sort]"); if(s){ const k=s.dataset.sort; if(sort.k===k) sort.dir=-sort.dir; else sort={k:k,dir:k==="t"?-1:1}; page=1; render(); const nb=$('[data-sort="'+k+'"]'); if(nb) nb.focus(); return; }
+    const p=ev.target.closest("[data-pg]"); if(p&&!p.disabled){ const v=p.dataset.pg; page=v==="prev"?page-1:v==="next"?page+1:+v; render(); const nb=$('[data-pg="'+v+'"]:not([disabled])'); if(nb) nb.focus(); }
+  });
+  loadAll(false); render();
+})();
+</script>
+</body></html>

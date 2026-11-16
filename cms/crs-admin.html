@@ -1,0 +1,148 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Community Radio Admin · NaViGate CMS</title><link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.tblwrap{overflow-x:auto}
+.acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.toolbar{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:12px}
+.toolbar>div{min-width:170px}
+.err{color:var(--red);font-size:.8rem;font-weight:700;margin-top:3px}
+.invalid{border-color:var(--red)!important}
+.btn[disabled],.btn[aria-disabled=true]{opacity:.5;cursor:not-allowed}
+.sw[aria-disabled=true]{opacity:.5;cursor:not-allowed}
+.sw{border:0;width:44px;height:24px;border-radius:99px;background:#7d8a9c;position:relative;cursor:pointer;padding:0;vertical-align:middle}
+.sw:after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.sw[aria-checked=true]{background:var(--green)} .sw[aria-checked=true]:after{left:23px}
+.scroll{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.9rem;margin:12px 0}
+.dl dt{font-weight:700;color:var(--muted)} .dl dd{margin:0}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}@media(max-width:600px){.row2{grid-template-columns:1fr}}
+tr.badrow td{background:#fdf0ee}
+[hidden]{display:none!important}
+.main{min-width:0}
+</style></head><body>
+<div id="tb"></div>
+<div class="note" id="roleNote" role="note" style="margin-bottom:16px"></div>
+<div><div class="tabs" role="tablist" aria-label="Community radio administration"><button class="on" role="tab" aria-selected="true" data-pane="p-st">Stations</button><button role="tab" aria-selected="false" data-pane="p-bulk">Bulk upload</button><button role="tab" aria-selected="false" data-pane="p-aw">Award submissions</button></div>
+<section class="pane on" id="p-st" role="tabpanel">
+ <div class="card">
+  <div class="toolbar"><div><label for="sQ">Search</label><input type="search" id="sQ" placeholder="Name, state or language"></div><div><label for="sS">Status</label><select id="sS"><option value="">All</option><option>Live</option><option>Pending</option><option>Inactive</option><option>Pending approval</option></select></div><div style="min-width:0;margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><button class="btn ok" id="apAll" hidden>Approve all pending</button><button class="btn" id="addSt">+ Add station</button></div></div>
+  <div class="muted" id="sCnt" aria-live="polite" style="margin-bottom:6px"></div>
+  <div class="tblwrap"><table class="t" aria-label="Stations"><thead><tr><th>ID</th><th>Station</th><th>State / UT</th><th>Language</th><th>Episodes</th><th>Hours</th><th>Status</th><th>Live</th><th>Actions</th></tr></thead><tbody id="stRows"></tbody></table></div>
+ </div>
+</section>
+<section class="pane" id="p-bulk" role="tabpanel">
+ <div class="card">
+  <h2 style="font-size:1.2rem">Bulk upload stations (about 100 at a time)</h2>
+  <p class="muted" style="margin-top:0">Upload a CSV with the header <code>name,state,language,status</code> (status optional: Live, Pending or Inactive). Rows are validated before import.</p>
+  <div class="toolbar"><div style="min-width:260px"><label for="csv">CSV file</label><input type="file" id="csv" accept=".csv,text/csv"></div><div style="min-width:0"><button class="btn sec" id="sample">Download sample CSV (100 stations)</button></div></div>
+  <div id="prev" hidden>
+   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0" aria-live="polite"><span class="chip b" id="pTot"></span><span class="chip g" id="pOk"></span><span class="chip r" id="pBad"></span><span class="muted" id="pFile" style="font-size:.85rem"></span></div>
+   <div class="scroll"><table class="t" aria-label="CSV preview"><thead><tr><th>Row</th><th>Name</th><th>State</th><th>Language</th><th>Status</th><th>Check</th></tr></thead><tbody id="pRows"></tbody></table></div>
+   <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap"><button class="btn ok" id="imp">Import valid rows</button><button class="btn sec" id="pClr">Clear</button></div>
+  </div>
+ </div>
+</section>
+<section class="pane" id="p-aw" role="tabpanel">
+ <div class="card">
+  <div class="toolbar"><div><label for="aF">Status</label><select id="aF"><option value="">All</option><option>Submitted</option><option>Under review</option><option>Approved</option><option>Returned</option></select></div><div class="muted" id="aCnt" style="padding-bottom:10px" aria-live="polite"></div></div>
+  <div class="tblwrap"><table class="t" aria-label="Award submissions"><thead><tr><th>Ref / ID</th><th>Station</th><th>Category</th><th>Submitted</th><th>Docs</th><th>Status</th><th>Actions</th></tr></thead><tbody id="aRows"></tbody></table></div>
+ </div>
+</section>
+</div>
+<script src="../assets/js/data.js"></script><script src="../assets/js/app.js"></script><script src="core-lib.js"></script>
+<script>
+document.getElementById("tb").innerHTML=ADG.topbar("Community Radio administration","Station management, bulk upload and National Community Radio Awards review");
+ADG.admin({active:"crsadm"});
+(function(){
+const {D,$,$$,store,toast,esc}=ADG, C=CORE, TODAY="2026-11-15";
+const role=ADG.role()||"Unknown", can=p=>ADG.can(p);
+const BANNER={
+ "Inputter":"You can add and edit stations and bulk-import CSV; new stations go to an Approver for approval. You cannot approve stations, decide awards or delete.",
+ "Approver":"You can approve new stations and decide award nominations (approve or return). You cannot add, edit, import or delete stations.",
+ "Super Admin":"You can add, edit and delete stations and import CSV; new stations still need Approver approval. You cannot approve stations or decide awards."
+};
+$("#roleNote").innerHTML="<b>"+esc(role)+".</b> "+esc(BANNER[role]||"Your role has no access to community radio administration.");
+const WHY={edit:"Only an Inputter or Super Admin can add or edit stations",decide:"Only an Approver can approve stations and decide awards",del:"Only a Super Admin can delete stations",pend:"Awaiting Approver approval"};
+const dis=(ok,why)=>ok?"":' disabled aria-disabled="true" title="'+esc(why)+'"';
+const mdl=C.modal;
+const getSt=()=>store.get("crs_stations",null)||D.stations.map(s=>Object.assign({},s));
+const setSt=l=>store.set("crs_stations",l);
+const getPend=()=>{const p=store.get("crs_stations_pending",[]);return Array.isArray(p)?p:[];};
+const setPend=l=>store.set("crs_stations_pending",l);
+const allSt=()=>getPend().map(s=>Object.assign({},s,{pending:true})).concat(getSt());
+const nextId=()=>Math.max(0,...getSt().map(s=>s.id),...getPend().map(s=>s.id))+1;
+const SCH={Live:"g",Pending:"o",Inactive:""};
+const STATES=["Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal","Delhi","Jammu and Kashmir","Ladakh","Puducherry","Chandigarh"];
+
+/* ---------- stations ---------- */
+function renderSt(){const q=$("#sQ").value.trim().toLowerCase(),s=$("#sS").value,all=allSt(),ce=can("master.edit"),cd=can("master.decide"),cx=can("master.delete");
+ const r=all.filter(x=>(!s||(s==="Pending approval"?x.pending:(!x.pending&&x.status===s)))&&(!q||(x.name+" "+x.state+" "+x.lang).toLowerCase().includes(q)));
+ $("#sCnt").textContent=r.length+" of "+all.length+" stations";
+ const np=all.filter(x=>x.pending).length,ap=$("#apAll");ap.hidden=!cd;ap.textContent="Approve all pending ("+np+")";ap.disabled=!np;ap.setAttribute("aria-disabled",!np);ap.title=np?"Approve every station awaiting approval":"No stations are awaiting approval";
+ const ad=$("#addSt");ad.disabled=!ce;ad.setAttribute("aria-disabled",!ce);ad.title=ce?"Add a station (needs Approver approval)":WHY.edit;
+ $("#stRows").innerHTML=r.length?r.map(x=>{const swOff=!ce||x.pending;return '<tr><td>'+x.id+'</td><td><b>'+esc(x.name)+'</b></td><td>'+esc(x.state)+'</td><td>'+esc(x.lang)+'</td><td>'+x.episodes+'</td><td>'+x.hours+'</td><td>'+(x.pending?'<span class="chip o">Pending approval</span><div class="muted" style="font-size:.74rem">Requested: '+esc(x.status)+'</div>':'<span class="chip '+(SCH[x.status]||"")+'">'+esc(x.status)+'</span>')+'</td><td><button class="sw" role="switch" aria-checked="'+(!x.pending&&x.status==="Live")+'" aria-label="Station '+esc(x.name)+' live" data-tg="'+x.id+'"'+dis(!swOff,x.pending?WHY.pend:WHY.edit)+'></button></td><td><div class="acts"><button class="btn sec sm" data-ed="'+x.id+'"'+dis(ce,WHY.edit)+' aria-label="Edit '+esc(x.name)+'">Edit</button>'+(x.pending?'<button class="btn ok sm" data-sap="'+x.id+'"'+dis(cd,WHY.decide)+' aria-label="Approve station '+esc(x.name)+'">Approve</button>':'')+'<button class="btn bad sm" data-sdel="'+x.id+'"'+dis(cx,WHY.del)+' aria-label="Delete '+esc(x.name)+'">Delete</button></div></td></tr>';}).join(""):'<tr><td colspan="9" class="muted" style="text-align:center;padding:24px">No stations match.</td></tr>';}
+$("#sQ").oninput=renderSt;$("#sS").onchange=renderSt;
+$("#addSt").onclick=()=>{if(!can("master.edit"))return;stDlg(null);};
+function locate(id){let l=getPend(),x=l.find(s=>s.id==id);if(x)return{l,x,pend:true};l=getSt();x=l.find(s=>s.id==id);return x?{l,x,pend:false}:null;}
+function stDlg(id){if(!can("master.edit"))return;const f=id?locate(id):null;if(id&&!f)return;const x=f?f.x:{name:"",state:"",lang:"",status:"Pending"};
+ mdl('<h2 style="font-size:1.2rem" id="sdT">'+(id?"Edit station":"Add station")+'</h2>'+(!id||(f&&f.pend)?'<div class="muted" style="font-size:.85rem;margin-bottom:6px">This station is published only after an Approver approves it.</div>':'')+'<form id="sf" novalidate><label for="fN">Station name *</label><input type="text" id="fN" value="'+esc(x.name)+'"><div class="err" id="eN"></div><div class="row2"><div><label for="fSt">State / UT *</label><input type="text" id="fSt" list="stList" value="'+esc(x.state)+'"><datalist id="stList">'+STATES.map(s=>'<option value="'+s+'">').join("")+'</datalist><div class="err" id="eS"></div></div><div><label for="fL">Language *</label><input type="text" id="fL" value="'+esc(x.lang)+'"><div class="err" id="eL"></div></div></div><label for="fSs">'+(!id||(f&&f.pend)?"Status once approved":"Status")+'</label><select id="fSs">'+["Live","Pending","Inactive"].map(s=>'<option'+(s===x.status?" selected":"")+'>'+s+'</option>').join("")+'</select><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px"><button type="button" class="btn sec" data-close>Cancel</button><button type="submit" class="btn">Save station</button></div></form>',bg=>{
+  bg.querySelector("#sf").onsubmit=e=>{e.preventDefault();if(!can("master.edit"))return;const g=i=>bg.querySelector(i);const n=g("#fN").value.trim(),st=g("#fSt").value.trim(),l=g("#fL").value.trim();let bad=0;
+   const chk=(i,er,m)=>{g(er).textContent=m;g(i).classList.toggle("invalid",!!m);if(m)bad++;};
+   chk("#fN","#eN",!n?"Station name is required.":allSt().some(s=>s.id!=id&&s.name.toLowerCase()===n.toLowerCase())?"A station with this name already exists.":"");
+   chk("#fSt","#eS",st?"":"State / UT is required.");chk("#fL","#eL",l?"":"Language is required.");
+   if(bad){bg.querySelector(".invalid").focus();return;}
+   const ns=g("#fSs").value;
+   if(id){const c=locate(id);if(!c)return;const ch=[];if(c.x.name!==n)ch.push("Name: "+c.x.name+" → "+n);if(c.x.state!==st)ch.push("State: "+c.x.state+" → "+st);if(c.x.lang!==l)ch.push("Language: "+c.x.lang+" → "+l);if(c.x.status!==ns)ch.push("Status: "+c.x.status+" → "+ns);
+    Object.assign(c.x,{name:n,state:st,lang:l,status:ns});(c.pend?setPend:setSt)(c.l);C.audit("Edited","Station: "+n,(c.pend?"[pending approval] ":"")+(ch.join("; ")||"No field changes"));}
+   else{const p=getPend();p.unshift({id:nextId(),name:n,state:st,lang:l,episodes:0,hours:0,status:ns,by:ADG.user().name});setPend(p);C.audit("Created","Station: "+n,"Submitted for approval (requested status: "+ns+")");}
+   bg.remove();renderSt();toast(id?"Station updated: "+n:"Station added for approval: "+n);};});}
+function approveSt(id){if(!can("master.decide"))return;const p=getPend(),x=p.find(s=>s.id==id);if(!x)return;const rec=Object.assign({},x);delete rec.by;setPend(p.filter(s=>s.id!=id));const l=getSt();l.push(rec);setSt(l);C.audit("Approved","Station: "+x.name,"Station approved; status "+x.status+(x.by?"; created by "+x.by:""));renderSt();toast("Station approved: "+x.name);}
+function delSt(id){if(!can("master.delete"))return;const c=locate(id);if(!c)return;
+ C.confirm({title:"Delete station?",ok:"Delete station",cls:"bad",msg:'<b>'+esc(c.x.name)+'</b> will be permanently removed from the station list. This action is recorded in the audit trail.',onOk:()=>{if(!can("master.delete"))return;const c2=locate(id);if(!c2)return;(c2.pend?setPend:setSt)(c2.l.filter(s=>s.id!=id));C.audit("Deleted","Station: "+c2.x.name,c2.pend?"Was pending approval":"Status was "+c2.x.status);renderSt();toast("Station deleted: "+c2.x.name);}});}
+$("#apAll").onclick=()=>{if(!can("master.decide"))return;const p=getPend();if(!p.length)return;const l=getSt();p.forEach(x=>{const r=Object.assign({},x);delete r.by;l.push(r);});setSt(l);setPend([]);C.audit("Approved","Stations ("+p.length+")","Approved all pending: "+p.map(x=>x.name).slice(0,5).join(", ")+(p.length>5?" and "+(p.length-5)+" more":""));renderSt();toast("Approved "+p.length+" station"+(p.length>1?"s":""));};
+document.addEventListener("click",ev=>{const t=ev.target.closest("button");if(!t||t.disabled||t.getAttribute("aria-disabled")==="true")return;const d=t.dataset;
+ if(d.ed){if(can("master.edit"))stDlg(d.ed);}
+ else if(d.tg){if(!can("master.edit"))return;const c=locate(d.tg);if(!c||c.pend)return;c.x.status=c.x.status==="Live"?"Inactive":"Live";setSt(c.l);C.audit("Status changed","Station: "+c.x.name,"Now "+c.x.status);renderSt();toast(c.x.name+" is now "+c.x.status);const sw=$('[data-tg="'+d.tg+'"]');sw&&sw.focus();}
+ else if(d.sap)approveSt(d.sap);else if(d.sdel)delSt(d.sdel);
+ else if(d.view)viewAw(d.view);else if(d.ap)decide(d.ap,"Approved","");else if(d.rt)returnDlg(d.rt);});
+
+/* ---------- bulk CSV ---------- */
+(function(){const ce=can("master.edit"),f=$("#csv");if(!ce){f.disabled=true;f.setAttribute("aria-disabled","true");f.title=WHY.edit;}})();
+function parseCSV(text){text=text.replace(/^﻿/,"");const rows=[];let row=[],cur="",q=false;
+ for(let i=0;i<text.length;i++){const c=text[i];if(q){if(c==='"'){if(text[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=c;}else if(c==='"')q=true;else if(c===","){row.push(cur);cur="";}else if(c==="\n"||c==="\r"){if(c==="\r"&&text[i+1]==="\n")i++;row.push(cur);cur="";if(row.some(x=>x.trim()!==""))rows.push(row);row=[];}else cur+=c;}
+ row.push(cur);if(row.some(x=>x.trim()!==""))rows.push(row);return rows;}
+let parsed=[],parsedName="";
+function validate(rows){const exist=new Set(allSt().map(s=>s.name.toLowerCase())),seen=new Set(),out=[];
+ rows.forEach((r,i)=>{const o={n:i+2,name:(r[0]||"").trim(),state:(r[1]||"").trim(),lang:(r[2]||"").trim(),status:(r[3]||"").trim()||"Pending",why:""};
+  if(!o.name)o.why="Name missing";else if(!o.state)o.why="State missing";else if(!o.lang)o.why="Language missing";else if(!["Live","Pending","Inactive"].includes(o.status))o.why="Invalid status '"+o.status+"'";else if(exist.has(o.name.toLowerCase()))o.why="Already exists";else if(seen.has(o.name.toLowerCase()))o.why="Duplicate in file";
+  seen.add(o.name.toLowerCase());out.push(o);});return out;}
+function showPrev(name){const ok=parsed.filter(x=>!x.why).length,ce=can("master.edit"),im=$("#imp");$("#prev").hidden=false;$("#pTot").textContent=parsed.length+" rows read";$("#pOk").textContent=ok+" valid";$("#pBad").textContent=(parsed.length-ok)+" invalid";$("#pFile").textContent=name;
+ im.disabled=!ok||!ce;im.setAttribute("aria-disabled",im.disabled);im.title=!ce?WHY.edit:!ok?"No valid rows to import":"Import valid rows for approval";
+ $("#pRows").innerHTML=parsed.map(x=>'<tr class="'+(x.why?"badrow":"")+'"><td>'+x.n+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.state)+'</td><td>'+esc(x.lang)+'</td><td>'+esc(x.status)+'</td><td>'+(x.why?'<span class="chip r">'+esc(x.why)+'</span>':'<span class="chip g">Valid</span>')+'</td></tr>').join("");}
+$("#csv").onchange=e=>{const f=e.target.files[0];if(!f)return;if(!can("master.edit")){toast(WHY.edit+".");e.target.value="";return;}if(!/\.csv$/i.test(f.name)&&f.type!=="text/csv"){toast("Please choose a .csv file.");e.target.value="";return;}
+ const rd=new FileReader();rd.onload=()=>{const rows=parseCSV(String(rd.result));if(!rows.length){toast("The file is empty.");return;}
+  const h=rows[0].map(x=>x.trim().toLowerCase());if(h[0]!=="name"||h[1]!=="state"||h[2]!=="language"){parsed=[];$("#prev").hidden=true;toast("Header must start with name,state,language.");return;}
+  parsed=validate(rows.slice(1));parsedName=f.name;showPrev(f.name);toast("Read "+parsed.length+" rows: "+parsed.filter(x=>!x.why).length+" valid, "+parsed.filter(x=>x.why).length+" invalid");};rd.onerror=()=>toast("Could not read the file.");rd.readAsText(f);};
+$("#imp").onclick=()=>{if(!can("master.edit")){toast(WHY.edit+".");return;}const ok=parsed.filter(x=>!x.why),bad=parsed.length-ok.length;if(!ok.length){toast("No valid rows to import.");return;}const p=getPend();let id=nextId()-1;
+ const recs=ok.map(x=>({id:++id,name:x.name,state:x.state,lang:x.lang,episodes:0,hours:0,status:x.status,by:ADG.user().name}));
+ setPend(recs.concat(p));C.audit("Bulk import","Stations from "+parsedName+" ("+ok.length+")","Submitted for approval"+(bad?"; "+bad+" invalid row(s) skipped":""));
+ toast("Imported "+ok.length+" stations for approval"+(bad?" ("+bad+" skipped)":""));parsed=[];$("#prev").hidden=true;$("#csv").value="";renderSt();};
+$("#pClr").onclick=()=>{parsed=[];$("#prev").hidden=true;$("#csv").value="";};
+function dl(name,text,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:type||"text/csv"}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),500);}
+$("#sample").onclick=()=>{const L=[["Andhra Pradesh","Telugu"],["Assam","Assamese"],["Bihar","Hindi"],["Gujarat","Gujarati"],["Haryana","Hindi"],["Jharkhand","Santali"],["Karnataka","Kannada"],["Kerala","Malayalam"],["Odisha","Odia"],["Punjab","Punjabi"]];const out=["name,state,language,status"];
+ for(let i=1;i<=100;i++){const s=L[i%L.length];out.push(['Gram Vani '+String(i).padStart(3,"0"),s[0],s[1],i%7===0?"Pending":"Live"].join(","));}
+ out[10]="Gram Vani 010,,Hindi,Live";out[25]="Gram Vani 025,Kerala,Malayalam,Active";out[40]="Gram Vani 040,Assam,,Live";out[60]="Gram Vani 005,Bihar,Hindi,Live";
+ dl("sample_stations_100.csv",out.join("\n")+"\n");toast("Sample CSV downloaded (4 deliberately invalid rows)");};
+
+/* ---------- awards review ---------- */
+const AST={Submitted:"b","Under review":"o",Approved:"g",Returned:"r"};
+function allAw(){const ov=store.get("awards_status",{}),nt=store.get("awards_notes",{});return store.get("awards_new",[]).slice().reverse().concat(D.awards).map(a=>Object.assign({},a,{status:ov[a.id]||a.status,note:nt[a.id]||""}));}
+function renderAw(){const f=$("#aF").value,r=allAw().filter(a=>!f||a.status===f),cd=can("master.decide");$("#aCnt").textContent=r.length+" of "+allAw().length+" submissions";
+ $("#aRows").innerHTML=r.length?r.map(a=>{const d=dis(cd,WHY.decide);return '<tr><td><b>'+esc(a.ref||a.id)+'</b>'+(a.ref?'<div class="muted" style="font-size:.74rem">'+esc(a.id)+'</div>':'')+'</td><td>'+esc(a.station)+'</td><td>'+esc(a.cat)+'</td><td>'+esc(a.date)+'</td><td>'+a.docs+'</td><td><span class="chip '+(AST[a.status]||"")+'">'+esc(a.status)+'</span>'+(a.note?'<div class="muted" style="font-size:.74rem">Note: '+esc(a.note)+'</div>':'')+'</td><td><div class="acts"><button class="btn sec sm" data-view="'+esc(a.id)+'">View</button><button class="btn ok sm" data-ap="'+esc(a.id)+'"'+(a.status==="Approved"?' disabled aria-disabled="true" title="Already approved"':d)+'>Approve</button><button class="btn warn sm" data-rt="'+esc(a.id)+'"'+(a.status==="Returned"?' disabled aria-disabled="true" title="Already returned"':d)+'>Return</button></div></td></tr>';}).join(""):'<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">No submissions with this status.</td></tr>';}
+$("#aF").onchange=renderAw;
+function decide(id,status,note){if(!can("master.decide"))return;const a=allAw().find(x=>x.id===id);const ov=store.get("awards_status",{}),nt=store.get("awards_notes",{});ov[id]=status;if(note)nt[id]=note;else delete nt[id];store.set("awards_status",ov);store.set("awards_notes",nt);C.audit(status==="Approved"?"Approved":"Returned","Award nomination "+id+(a?": "+a.station:""),note||"");renderAw();toast(id+" marked "+status);}
+function viewAw(id){const a=allAw().find(x=>x.id===id);if(!a)return;mdl('<h2 style="font-size:1.2rem" id="vwT">Nomination '+esc(a.ref||a.id)+'</h2><dl class="dl"><dt>Station</dt><dd>'+esc(a.station)+'</dd><dt>Category</dt><dd>'+esc(a.cat)+'</dd><dt>Submitted</dt><dd>'+esc(a.date)+'</dd><dt>Status</dt><dd><span class="chip '+(AST[a.status]||"")+'">'+esc(a.status)+'</span></dd><dt>Documents</dt><dd>'+(a.files?a.files.map(esc).join(", "):a.docs+" file(s) on record")+'</dd><dt>Narrative</dt><dd>'+(a.narrative?esc(a.narrative):'<span class="muted">Sample record: narrative held in the awards file.</span>')+'</dd></dl><div style="text-align:right"><button class="btn sec" data-close>Close</button></div>');}
+function returnDlg(id){if(!can("master.decide"))return;mdl('<h2 style="font-size:1.2rem" id="rtT">Return nomination '+esc(id)+'</h2><label for="rN">Reason for return *</label><textarea id="rN" rows="4" placeholder="Tell the station what to correct"></textarea><div class="err" id="rE" role="alert"></div><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px"><button class="btn sec" data-close>Cancel</button><button class="btn warn" id="rGo">Return to station</button></div>',bg=>{bg.querySelector("#rGo").onclick=()=>{if(!can("master.decide"))return;const n=bg.querySelector("#rN").value.trim();if(n.length<5){bg.querySelector("#rE").textContent="Please enter a reason (at least 5 characters).";bg.querySelector("#rN").focus();return;}decide(id,"Returned",n);bg.remove();};});}
+ADG.tabs();$$(".tabs button").forEach(b=>b.addEventListener("click",()=>$$(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b))));
+renderSt();renderAw();
+})();
+</script></body></html>

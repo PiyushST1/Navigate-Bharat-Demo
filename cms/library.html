@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Content library · NaViGate CMS</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<style>
+[hidden]{display:none!important}
+.tools{display:grid;grid-template-columns:2fr repeat(3,1fr) auto;gap:10px;align-items:end}
+.tools label{margin:0 0 3px}
+@media(max-width:1000px){.tools{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.tools{grid-template-columns:1fr}}
+.bulk{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:14px 0 10px;padding:10px 12px;background:var(--soft);border:1px solid var(--line);border-radius:10px}
+.bulk .cnt{font-weight:700;margin-right:auto}
+table.t th button{all:unset;cursor:pointer;color:#fff;font-weight:700;font-size:.82rem;display:inline-flex;gap:4px;align-items:center}
+table.t th button:focus-visible{outline:3px solid var(--saffron)}
+table.t td.ti{max-width:340px}
+table.t td.ti b{display:block;line-height:1.3}
+.sq{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:middle}
+.ra{display:flex;gap:5px;white-space:nowrap}
+.pg{display:flex;gap:6px;align-items:center;justify-content:space-between;margin-top:14px;flex-wrap:wrap}
+.pg .nums{display:flex;gap:4px;flex-wrap:wrap}
+.pg .nums button.on{background:var(--navy2);color:#fff}
+.empty{text-align:center;padding:40px 10px}
+.empty .big{font-size:2.4rem}
+video.pv{width:100%;border-radius:10px;background:#000;max-height:50vh}
+</style></head>
+<body>
+<div id="top"></div>
+<div id="roleNote" style="margin-bottom:16px"></div>
+<section class="card" aria-label="Search and filters">
+  <div class="tools">
+    <div><label for="q">Search</label><input type="search" id="q" placeholder="Title, tag, ID, language" autocomplete="off"></div>
+    <div><label for="fc">Category</label><select id="fc"></select></div>
+    <div><label for="fl">Language</label><select id="fl"></select></div>
+    <div><label for="fs">Status</label><select id="fs"></select></div>
+    <div style="display:flex;gap:8px"><button class="btn sec" id="reset">Reset</button><button class="btn" id="csv">Export CSV</button></div>
+  </div>
+  <div style="display:flex;gap:14px;align-items:end;margin-top:10px;flex-wrap:wrap">
+    <div style="min-width:200px"><label for="so">Sort by</label><select id="so"></select></div>
+    <div class="muted" id="count" role="status" aria-live="polite" style="font-weight:700;margin-left:auto"></div>
+  </div>
+</section>
+<div class="bulk" id="bulk" hidden role="group" aria-label="Bulk actions">
+  <span class="cnt" id="selc">0 selected</span>
+  <button class="btn sec sm" id="selall" hidden>Select all matching</button>
+  <button class="btn ok sm" id="bpub" hidden>Publish</button>
+  <button class="btn sec sm" id="bunp" hidden>Unpublish</button>
+  <button class="btn bad sm" id="bdel" hidden>Delete</button>
+</div>
+<div class="tbl-wrap"><table class="t" id="tbl"><caption class="sr-only">Content library</caption><thead></thead><tbody></tbody></table></div>
+<div class="pg" id="pg"></div>
+<script src="../assets/js/data.js"></script><script src="../assets/js/app.js"></script><script src="core-lib.js"></script>
+<script>
+document.getElementById("top").innerHTML=ADG.topbar("Content library","Search, filter, bulk-manage and export all videos");
+ADG.admin({active:"library"});
+(function(){
+  const A=ADG,C=CORE,D=A.D,$=A.$,esc=A.esc,PER=10;
+  const u=C.user(), R=A.role();
+  const cPub=A.can("content.publish"), cUnp=A.can("content.unpublish"), cDel=A.can("content.delete"), cEdAny=A.can("content.edit"), cEdOwn=A.can("content.edit.own"), cSub=A.can("content.submit");
+  const hasBulk=cPub||cUnp||cDel;
+  const BAN={"Inputter":"<b>Inputter.</b> You can view all content and edit only your own drafts and returned items. You cannot publish, unpublish or delete.","Approver":"<b>Approver.</b> You can view content and publish or unpublish it. You cannot edit or delete content.","Super Admin":"<b>Super Admin.</b> You can edit any metadata, unpublish and delete content. You cannot publish or upload."};
+  $("#roleNote").innerHTML='<div class="note" role="note">'+(BAN[R]||"<b>Read-only.</b> Your role is not recognised, so content actions are unavailable.")+'</div>';
+  $("#bulk").hidden=!hasBulk; $("#bpub").hidden=!cPub; $("#bunp").hidden=!cUnp; $("#bdel").hidden=!cDel;
+  const isOwn=i=>!!u.name&&i.by===u.name;
+  const mayEdit=i=>cEdAny||(cEdOwn&&isOwn(i)&&(i.status==="Draft"||i.status==="Returned"));
+  const NOEDIT="You can edit only your own drafts and returned items";
+  const st={q:"",cat:"",lang:"",status:"",k:"date",dir:-1,page:1,sel:new Set()};
+  const COLS=[["title","Title"],["catName","Category"],["lang","Language"],["dur","Duration"],["status","Status"],["date","Date"],["views","Views"]];
+  const STAT=["Published","Unpublished","Draft","Pending approval","Approved","Returned"];
+  $("#fc").innerHTML='<option value="">All categories</option>'+D.cats.map(c=>'<option value="'+c.id+'">'+esc(c.name)+'</option>').join("");
+  $("#fl").innerHTML='<option value="">All languages</option>'+D.langs.map(l=>'<option>'+l+'</option>').join("");
+  $("#fs").innerHTML='<option value="">All statuses</option>'+STAT.map(s=>'<option>'+s+'</option>').join("");
+  $("#so").innerHTML=[["date|-1","Newest first"],["date|1","Oldest first"],["title|1","Title A to Z"],["title|-1","Title Z to A"],["views|-1","Most viewed"],["views|1","Least viewed"],["status|1","Status"],["catName|1","Category"]].map(o=>'<option value="'+o[0]+'">'+o[1]+'</option>').join("");
+  $("#bpub").title="Publish selected approved videos";
+
+  let all=[];
+  function filtered(){
+    all=C.items(); const q=st.q.trim().toLowerCase();
+    let r=all.filter(i=>(!st.cat||i.cat===st.cat)&&(!st.lang||i.lang===st.lang)&&(!st.status||i.status===st.status)&&
+      (!q||(i.title+" "+i.catName+" "+i.lang+" "+(i.tags||[]).join(" ")+" "+i.key+" "+i.status).toLowerCase().indexOf(q)>-1));
+    const k=st.k,d=st.dir;
+    r.sort((a,b)=>{ let x=a[k],y=b[k]; if(k==="dur"){ const s=v=>{const m=String(v).split(":");return m.length===2?+m[0]*60+ +m[1]:0;}; x=s(x);y=s(y);} if(typeof x==="string"){ x=x.toLowerCase(); y=String(y).toLowerCase(); } return (x<y?-1:x>y?1:0)*d; });
+    return r;
+  }
+  function head(){
+    $("#tbl thead").innerHTML='<tr>'+(hasBulk?'<th style="width:36px"><input type="checkbox" id="sa" aria-label="Select all rows on this page"></th>':'')+''+COLS.map(c=>'<th scope="col" aria-sort="'+(st.k===c[0]?(st.dir>0?"ascending":"descending"):"none")+'"><button data-k="'+c[0]+'" aria-label="Sort by '+c[1]+'">'+c[1]+(st.k===c[0]?(st.dir>0?" ▲":" ▼"):"")+'</button></th>').join("")+'<th scope="col">Actions</th></tr>';
+    $$k("#tbl th button").forEach(b=>b.onclick=()=>{ const k=b.dataset.k; if(st.k===k) st.dir*=-1; else { st.k=k; st.dir=(k==="date"||k==="views")?-1:1; } syncSort(); st.page=1; render(); });
+  }
+  function $$k(s){ return A.$$(s); }
+  function syncSort(){ const v=st.k+"|"+st.dir, o=$("#so"); o.value=[...o.options].some(x=>x.value===v)?v:o.value; }
+  function render(){
+    const rows=filtered(), n=rows.length, pages=Math.max(1,Math.ceil(n/PER)); if(st.page>pages) st.page=pages;
+    const from=(st.page-1)*PER, pageRows=rows.slice(from,from+PER);
+    head();
+    $("#count").textContent=n+" result"+(n===1?"":"s")+(n!==all.length?" (filtered from "+all.length+")":"");
+    const tb=$("#tbl tbody");
+    if(!n){ tb.innerHTML='<tr><td colspan="'+(hasBulk?9:8)+'"><div class="empty"><div class="big" aria-hidden="true">🔍</div><h3>No videos match</h3><p class="muted">Try a different search or clear the filters.</p><button class="btn" id="clr">Clear filters</button></div></td></tr>'; $("#clr").onclick=reset; }
+    else tb.innerHTML=pageRows.map(i=>'<tr data-k="'+i.key+'">'+(hasBulk?'<td><input type="checkbox" class="rc" value="'+i.key+'" aria-label="Select '+esc(i.title)+'"'+(st.sel.has(i.key)?" checked":"")+'></td>':'')+
+      '<td class="ti"><span class="sq" style="background:'+i.color+'"></span><b style="display:inline">'+esc(i.title)+'</b>'+(i.source==="upload"?' <span class="chip b">New</span>':'')+'<div class="muted" style="font-size:.75rem">'+esc(i.key)+' · '+esc(i.by||"")+'</div></td>'+
+      '<td>'+esc(i.catName)+'</td><td>'+esc(i.lang)+'</td><td>'+esc(i.dur)+'</td><td>'+C.statusChip(i.status)+'</td><td>'+esc(i.date)+'</td><td>'+(i.views?A.fmt(i.views):"—")+'</td>'+
+      '<td><div class="ra"><button class="btn sec sm" data-a="pv" data-k="'+i.key+'" aria-label="Preview '+esc(i.title)+'">Preview</button>'+rowActs(i)+'</div></td></tr>').join("");
+    // checkboxes
+    const sa=$("#sa"); const ids=pageRows.map(i=>i.key);
+    if(sa){
+    const nsel=ids.filter(k=>st.sel.has(k)).length; sa.checked=ids.length>0&&nsel===ids.length; sa.indeterminate=nsel>0&&nsel<ids.length; sa.disabled=!ids.length;
+    sa.onchange=()=>{ ids.forEach(k=>sa.checked?st.sel.add(k):st.sel.delete(k)); render(); };
+    A.$$(".rc").forEach(c=>c.onchange=()=>{ c.checked?st.sel.add(c.value):st.sel.delete(c.value); bulkUI(rows); const ns=ids.filter(k=>st.sel.has(k)).length; sa.checked=ns===ids.length; sa.indeterminate=ns>0&&ns<ids.length; });
+    }
+    A.$$("[data-a]").forEach(b=>b.onclick=()=>{ if(b.getAttribute("aria-disabled")==="true") return; act(b.dataset.a,b.dataset.k); });
+    // pagination
+    const nums=[]; for(let p=1;p<=pages;p++) nums.push('<button class="btn sec sm'+(p===st.page?" on":"")+'" data-p="'+p+'" aria-label="Page '+p+'"'+(p===st.page?' aria-current="page"':"")+'>'+p+'</button>');
+    $("#pg").innerHTML='<div class="muted" style="font-size:.88rem">'+(n?"Showing "+(from+1)+" to "+Math.min(from+PER,n)+" of "+n:"No results")+'</div><div class="nums"><button class="btn sec sm" data-p="'+(st.page-1)+'" '+(st.page<=1?"disabled":"")+'>Previous</button>'+nums.join("")+'<button class="btn sec sm" data-p="'+(st.page+1)+'" '+(st.page>=pages?"disabled":"")+'>Next</button></div>';
+    A.$$("[data-p]").forEach(b=>b.onclick=()=>{ if(b.disabled) return; st.page=+b.dataset.p; render(); window.scrollTo(0,0); });
+    bulkUI(rows);
+  }
+  function rowActs(i){
+    const t=esc(i.title), k=i.key, h=[];
+    h.push('<button class="btn sec sm" data-a="pv" data-k="'+k+'" aria-label="Preview '+t+'">Preview</button>');
+    if(cEdAny||cEdOwn){
+      if(mayEdit(i)) h.push('<button class="btn sec sm" data-a="ed" data-k="'+k+'" aria-label="Edit '+t+'">Edit</button>');
+      else h.push('<button class="btn sec sm" data-a="ed" data-k="'+k+'" disabled aria-disabled="true" title="'+NOEDIT+'" aria-label="Edit '+t+' (not allowed: '+NOEDIT+')">Edit</button>');
+    }
+    if(cSub&&isOwn(i)&&i.status==="Draft"&&i.source==="upload") h.push('<button class="btn warn sm" data-a="sb" data-k="'+k+'" aria-label="Submit '+t+' for approval">Submit</button>');
+    if(cPub&&["Pending approval","Returned","Published"].indexOf(i.status)<0) h.push('<button class="btn ok sm" data-a="pb" data-k="'+k+'" aria-label="Publish '+t+'">Publish</button>');
+    if(cUnp&&i.status==="Published") h.push('<button class="btn sec sm" data-a="ub" data-k="'+k+'" aria-label="Unpublish '+t+'">Unpublish</button>');
+    if(cDel) h.push('<button class="btn bad sm" data-a="dl" data-k="'+k+'" aria-label="Delete '+t+'">Delete</button>');
+    return h.join("");
+  }
+  function bulkUI(rows){
+    if(!hasBulk) return;
+    const n=st.sel.size; $("#selc").textContent=n+" selected";
+    ["bpub","bunp","bdel"].forEach(id=>{ $("#"+id).disabled=!n; });
+    const sa=$("#selall"); const m=rows.filter(r=>!st.sel.has(r.key)).length; sa.hidden=!(m>0&&n>0); sa.textContent="Select all "+rows.length+" matching";
+    sa.onclick=()=>{ rows.forEach(r=>st.sel.add(r.key)); render(); };
+  }
+  function byKey(k){ return C.items().find(i=>i.key===k); }
+  function act(a,k){
+    const it=byKey(k); if(!it) return;
+    if(a==="pv") preview(it);
+    else if(a==="ed"){ if(mayEdit(it)) edit(it); }
+    else if(a==="dl"){ if(!A.can("content.delete")) return; C.confirm({title:"Delete video?",ok:"Delete",cls:"bad",msg:'Delete <b>'+esc(it.title)+'</b> from the library? This cannot be undone in this demo.',onOk:()=>{ if(!A.can("content.delete")) return; C.remove(k); st.sel.delete(k); C.audit("Deleted",it.title); A.toast("Deleted: "+it.title); render(); }}); }
+    else if(a==="pb"){ if(!A.can("content.publish")||["Pending approval","Returned","Published"].indexOf(it.status)>-1) return; C.update(k,{status:"Published"}); C.audit("Published",it.title); A.toast("Published: "+it.title); render(); }
+    else if(a==="ub"){ if(!A.can("content.unpublish")||it.status!=="Published") return; C.update(k,{status:"Unpublished"}); C.audit("Unpublished",it.title); A.toast("Unpublished: "+it.title); render(); }
+    else if(a==="sb"){ if(!A.can("content.submit")||!isOwn(it)||it.status!=="Draft"||it.source!=="upload") return; C.update(k,{status:"Pending approval"}); C.audit("Submitted for approval",it.title); A.toast("Submitted for approval: "+it.title); render(); }
+  }
+  function preview(it){
+    const b=C.modal('<h2>'+esc(it.title)+'</h2><video class="pv" controls preload="metadata" src="../assets/media/sample.mp4" aria-label="Preview of '+esc(it.title)+'"></video>'+
+      '<p style="margin:10px 0 6px"><span class="chip b">'+esc(it.catName)+'</span> <span class="chip">'+esc(it.lang)+'</span> '+C.statusChip(it.status)+' <span class="chip">'+esc(it.dur)+'</span></p><p style="margin:6px 0">'+esc(it.desc||"No description.")+'</p>'+
+      (it.source==="upload"?'<p class="muted" style="font-size:.82rem">Demo: the sample rendition is played for newly uploaded items.</p>':'')+
+      '<div class="mact"><button class="btn" data-close>Close</button></div>');
+  }
+  function edit(it){
+    if(!mayEdit(it)) return;
+    const b=C.modal('<h2>Edit video</h2><form id="ef" novalidate><label for="e1">Title *</label><input type="text" id="e1" value="'+esc(it.title)+'" maxlength="120"><div class="ferr" id="e1-e" role="alert"></div>'+
+      '<label for="e2">Description</label><textarea id="e2" rows="3" maxlength="500">'+esc(it.desc||"")+'</textarea>'+
+      '<div class="grid g2"><div><label for="e3">Category</label><select id="e3">'+D.cats.map(c=>'<option value="'+c.id+'"'+(c.id===it.cat?" selected":"")+'>'+esc(c.name)+'</option>').join("")+'</select></div><div><label for="e4">Language</label><select id="e4">'+D.langs.map(l=>'<option'+(l===it.lang?" selected":"")+'>'+l+'</option>').join("")+'</select></div></div>'+
+      '<label for="e5">Tags (comma separated)</label><input type="text" id="e5" value="'+esc((it.tags||[]).join(", "))+'">'+
+      '<label for="e6">Status</label><input type="text" id="e6" value="'+esc(it.status)+'" disabled aria-describedby="e6h"><div class="muted" id="e6h" style="font-size:.78rem">Status changes through Submit, the Approvals workflow, and Publish or Unpublish by authorised roles.</div>'+
+      '<div class="mact"><button type="button" class="btn sec" data-close>Cancel</button><button type="submit" class="btn">Save changes</button></div></form>');
+    b.querySelector("#ef").onsubmit=e=>{ e.preventDefault();
+      if(!mayEdit(it)) return;
+      const t=b.querySelector("#e1").value.trim(); const er=b.querySelector("#e1-e");
+      if(t.length<3){ er.textContent=t?"Title must be at least 3 characters.":"Title is required."; b.querySelector("#e1").classList.add("invalid"); b.querySelector("#e1").focus(); return; }
+      const patch={title:t,desc:b.querySelector("#e2").value.trim(),cat:b.querySelector("#e3").value,lang:b.querySelector("#e4").value,tags:b.querySelector("#e5").value.split(",").map(x=>x.trim()).filter(Boolean)};
+      C.update(it.key,patch); C.audit("Edited",t); b.remove(); A.toast("Saved changes to "+t); render(); };
+  }
+  function bulk(kind){
+    const need={del:"content.delete",pub:"content.publish",unp:"content.unpublish"}[kind];
+    if(!need||!A.can(need)) return;
+    const keys=[...st.sel]; if(!keys.length) return;
+    const items=keys.map(byKey).filter(Boolean);
+    if(kind==="del"){ C.confirm({title:"Delete "+items.length+" video"+(items.length>1?"s":"")+"?",ok:"Delete "+items.length,cls:"bad",msg:'The selected videos will be removed from the library. This cannot be undone in this demo.',onOk:()=>{ if(!A.can("content.delete")) return; items.forEach(i=>{ C.remove(i.key); C.audit("Deleted",i.title); }); st.sel.clear(); A.toast("Deleted "+items.length+" video"+(items.length>1?"s":"")); render(); }}); return; }
+    let ok=0,skip=0;
+    items.forEach(i=>{
+      if(kind==="pub"){ if(i.status==="Pending approval"||i.status==="Returned"||i.status==="Published"){ skip++; return; } C.update(i.key,{status:"Published"}); C.audit("Published",i.title); ok++; }
+      else { if(i.status!=="Published"){ skip++; return; } C.update(i.key,{status:"Unpublished"}); C.audit("Unpublished",i.title); ok++; }
+    });
+    A.toast((kind==="pub"?"Published ":"Unpublished ")+ok+" video"+(ok===1?"":"s")+(skip?" ("+skip+" skipped: "+(kind==="pub"?"not approved or already published":"not published")+")":""));
+    st.sel.clear(); render();
+  }
+  function reset(){ st.q="";st.cat="";st.lang="";st.status="";st.k="date";st.dir=-1;st.page=1; $("#q").value="";$("#fc").value="";$("#fl").value="";$("#fs").value="";$("#so").value="date|-1"; render(); }
+  function csv(){
+    const rows=filtered(); const q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+    const out=[["ID","Title","Category","Language","Duration","Status","Date","Views","Source"].map(q).join(",")].concat(rows.map(i=>[i.key,i.title,i.catName,i.lang,i.dur,i.status,i.date,i.views,i.source==="upload"?"CMS upload":"Library"].map(q).join(",")));
+    C.download("navigate-library-"+C.isoDate()+".csv","﻿"+out.join("\r\n"),"text/csv;charset=utf-8");
+    A.toast("Exported "+rows.length+" row"+(rows.length===1?"":"s")+" to CSV");
+  }
+  let tm; $("#q").oninput=function(){ clearTimeout(tm); tm=setTimeout(()=>{ st.q=$("#q").value; st.page=1; render(); },150); };
+  $("#fc").onchange=()=>{ st.cat=$("#fc").value; st.page=1; render(); };
+  $("#fl").onchange=()=>{ st.lang=$("#fl").value; st.page=1; render(); };
+  $("#fs").onchange=()=>{ st.status=$("#fs").value; st.page=1; render(); };
+  $("#so").onchange=()=>{ const v=$("#so").value.split("|"); st.k=v[0]; st.dir=+v[1]; st.page=1; render(); };
+  $("#reset").onclick=reset; $("#csv").onclick=csv;
+  $("#bpub").onclick=()=>bulk("pub"); $("#bunp").onclick=()=>bulk("unp"); $("#bdel").onclick=()=>bulk("del");
+  render();
+})();
+</script>
+</body></html>

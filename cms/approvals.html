@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Approvals · NaViGate CMS</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<style>
+[hidden]{display:none!important}
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start}
+@media(max-width:1000px){.board{grid-template-columns:1fr}}
+.col{background:var(--soft);border:1px solid var(--line);border-radius:var(--radius);padding:12px;min-height:160px}
+.col h2{font-size:1.05rem;display:flex;justify-content:space-between;align-items:center;margin:0 0 10px}
+.col h2 .chip{font-size:.8rem}
+.col.p{border-top:4px solid var(--saffron)}.col.a{border-top:4px solid var(--green)}.col.r{border-top:4px solid var(--red)}
+.ac{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+.ac h3{font-size:.98rem;margin:6px 0 4px;line-height:1.3}
+.ac .meta{font-size:.78rem;color:var(--muted)}
+.ac .cm{margin-top:8px;font-size:.84rem;background:#F8DAD6;color:#8e271d;border-radius:8px;padding:7px 10px}
+body.hc .ac .cm{background:#000;color:#fff;border:1px solid #fff}
+.ac .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.none{color:var(--muted);font-size:.88rem;text-align:center;padding:22px 6px}
+.stg-frame{border:2px solid var(--saffron);border-radius:12px;overflow:hidden}
+.stg-frame .bar1{background:var(--saffron);color:#0B1F3A;font-weight:700;font-size:.78rem;padding:5px 10px;text-align:center}
+.stg-frame .hd{display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--card);border-bottom:1px solid var(--line)}
+.stg-frame .bd{padding:14px;background:var(--bg)}
+video.pv{width:100%;border-radius:10px;background:#000;max-height:44vh}
+</style></head>
+<body>
+<div id="top"></div>
+<div id="roleNote"></div>
+<div class="board" id="board"></div>
+<section class="card" style="margin-top:22px" aria-labelledby="atT">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 id="atT" style="font-size:1.2rem;margin:0">Audit trail</h2><span class="muted" id="atN" style="font-size:.85rem"></span></div>
+  <div class="tbl-wrap" style="margin-top:10px;max-height:380px;overflow:auto"><table class="t"><thead><tr><th scope="col">Time</th><th scope="col">Actor</th><th scope="col">Action</th><th scope="col">Item</th><th scope="col">Comment</th></tr></thead><tbody id="audit"></tbody></table></div>
+</section>
+<script src="../assets/js/data.js"></script><script src="../assets/js/app.js"></script><script src="core-lib.js"></script>
+<script>
+document.getElementById("top").innerHTML=ADG.topbar("Approvals","Review workflow: Pending approval, Approved, Returned");
+ADG.admin({active:"approvals"});
+(function(){
+  const A=ADG,C=CORE,$=A.$,esc=A.esc,S=A.store;
+  const can=A.can("content.review"), u=C.user(), R=A.role(), canAudit=A.can("audit.view");
+  const BAN={"Approver":"<b>Approver.</b> You can approve items or return them with a comment, and preview them on staging. You cannot upload, edit or resubmit content.",
+    "Inputter":"<b>Inputter, read-only board.</b> You can view items and the staging preview, and resubmit your own returned items. You cannot approve or return items.",
+    "Super Admin":"<b>Super Admin, read-only board.</b> You can view items, the staging preview and the audit trail. You cannot approve, return or resubmit (no self-approval path)."};
+  $("#roleNote").innerHTML='<div class="note" role="note" style="margin-bottom:16px">'+(BAN[R]||"<b>Read-only view.</b> Your role is not recognised, so workflow actions are unavailable.")+'</div>';
+  const mayResubmit=i=>A.can("content.submit")&&!!u.name&&i.by===u.name&&i.status==="Returned";
+  const COLS=[["p","Pending approval"],["a","Approved"],["r","Returned"]];
+  const colOf=s=>s==="Pending approval"?"p":s==="Returned"?"r":"a";
+  function card(i){
+    const c=colOf(i.status);
+    const acts=[];
+    if(c==="p"&&can){ acts.push('<button class="btn ok sm" data-a="ap" data-k="'+i.key+'">Approve</button>','<button class="btn bad sm" data-a="rt" data-k="'+i.key+'">Return with comment</button>'); }
+    if(c==="r"&&mayResubmit(i)) acts.push('<button class="btn warn sm" data-a="rs" data-k="'+i.key+'">Resubmit</button>');
+    acts.push('<button class="btn sec sm" data-a="vw" data-k="'+i.key+'" aria-label="View '+esc(i.title)+'">View</button>','<button class="btn sec sm" data-a="sp" data-k="'+i.key+'" aria-label="Staging preview of '+esc(i.title)+'">Staging preview</button>');
+    return '<article class="ac" aria-label="'+esc(i.title)+'"><span class="chip b">'+esc(i.catName)+'</span> <span class="chip">'+esc(i.lang)+'</span>'+(c==="a"?' '+C.statusChip(i.status==="Approved"?"Approved":i.status):'')+
+      '<h3>'+esc(i.title)+'</h3><div class="meta">'+esc(i.key)+' · by '+esc(i.by||"—")+' · '+esc(i.date)+(i.size?' · '+C.bytes(i.size):'')+'</div>'+
+      (c==="r"&&i.comment?'<div class="cm"><b>Returned:</b> '+esc(i.comment)+'</div>':'')+
+      (c==="a"&&i.status==="Approved"&&C.staged().indexOf(i.key)>-1?'<div class="meta" style="margin-top:6px">On staging, awaiting promotion to live</div>':'')+
+      '<div class="acts">'+acts.join("")+'</div></article>';
+  }
+  let items=[];
+  function render(){
+    items=C.apprItems();
+    $("#board").innerHTML=COLS.map(c=>{ const l=items.filter(i=>colOf(i.status)===c[0]); return '<section class="col '+c[0]+'" aria-labelledby="h-'+c[0]+'"><h2 id="h-'+c[0]+'">'+c[1]+' <span class="chip">'+l.length+'</span></h2>'+(l.length?l.map(card).join(""):'<div class="none">Nothing here.</div>')+'</section>'; }).join("");
+    A.$$("#board [data-a]").forEach(b=>b.onclick=()=>act(b.dataset.a,b.dataset.k));
+    let au=C.auditList();
+    if(canAudit) $("#atN").textContent=au.length+" entries, newest first";
+    else { au=au.filter(e=>e.actor===u.name); $("#atN").textContent=au.length+" of your own entries (the full audit log is not available to your role)"; }
+    $("#audit").innerHTML=au.map(e=>'<tr><td style="white-space:nowrap">'+esc(e.at)+'</td><td>'+esc(e.actor)+'<div class="muted" style="font-size:.75rem">'+esc(e.role)+'</div></td><td><b>'+esc(e.action)+'</b></td><td>'+esc(e.item)+'</td><td>'+(e.note?esc(e.note):'<span class="muted">—</span>')+'</td></tr>').join("");
+  }
+  const get=k=>items.find(i=>i.key===k);
+  function act(a,k){
+    const it=get(k); if(!it) return;
+    if(a==="ap"){ if(!A.can("content.review")||it.status!=="Pending approval") return; C.apprUpdate(k,{status:"Approved",comment:""}); const s=C.staged(); if(s.indexOf(k)<0) s.push(k); S.set("staged",s); C.audit("Approved",it.title); A.toast("Approved: "+it.title+" (now on staging)"); render(); }
+    else if(a==="rt"){ if(can) ret(it); }
+    else if(a==="rs"){ if(!mayResubmit(it)) return; C.apprUpdate(k,{status:"Pending approval"}); C.audit("Resubmitted for approval",it.title); A.toast("Resubmitted for approval"); render(); }
+    else if(a==="vw") view(it);
+    else if(a==="sp") stage(it);
+  }
+  function ret(it){
+    const b=C.modal('<h2>Return with comment</h2><p class="muted" style="margin-top:0"><b>'+esc(it.title)+'</b></p><form id="rf" novalidate><label for="rc">Comment for the inputter *</label><textarea id="rc" rows="4" maxlength="400" aria-describedby="rc-e" placeholder="What needs to change before this can be approved?"></textarea><div class="ferr" id="rc-e" role="alert"></div><div class="mact"><button type="button" class="btn sec" data-close>Cancel</button><button class="btn bad" type="submit">Return item</button></div></form>');
+    b.querySelector("#rf").onsubmit=e=>{ e.preventDefault(); if(!A.can("content.review")) return; const t=b.querySelector("#rc").value.trim(); const er=b.querySelector("#rc-e");
+      if(t.length<5){ er.textContent=t?"Please add a little more detail (at least 5 characters).":"A comment is required when returning an item."; b.querySelector("#rc").classList.add("invalid"); b.querySelector("#rc").focus(); return; }
+      C.apprUpdate(it.key,{status:"Returned",comment:t}); const s=C.staged().filter(x=>x!==it.key); S.set("staged",s); C.audit("Returned",it.title,t); b.remove(); A.toast("Returned to inputter with comment"); render(); };
+  }
+  function view(it){
+    const b=C.modal('<h2>'+esc(it.title)+'</h2><video class="pv" controls preload="metadata" src="../assets/media/sample.mp4" aria-label="Video preview"></video><p style="margin:10px 0 6px"><span class="chip b">'+esc(it.catName)+'</span> <span class="chip">'+esc(it.lang)+'</span> '+C.statusChip(it.status)+' <span class="chip">'+esc(it.dur||"—")+'</span></p><p style="margin:6px 0">'+esc(it.desc||"No description.")+'</p><div class="meta muted" style="font-size:.82rem">'+esc(it.key)+' · submitted by '+esc(it.by||"—")+' on '+esc(it.date)+(it.size?' · '+C.bytes(it.size):'')+(it.tags&&it.tags.length?' · tags: '+esc(it.tags.join(", ")):'')+'</div>'+(it.comment?'<div class="note" style="margin-top:10px"><b>Reviewer comment:</b> '+esc(it.comment)+'</div>':'')+
+      '<div class="mact"><button class="btn sec" id="vsp">Staging preview</button><button class="btn" data-close>Close</button></div>');
+    b.querySelector("#vsp").onclick=()=>{ b.remove(); stage(it); };
+  }
+  function stage(it){
+    const b=C.modal('<h2>Staging preview</h2><p class="muted" style="margin-top:0">How this item will appear on the public portal once approved and promoted.</p>'+
+      '<div class="stg-frame"><div class="bar1">STAGING at NMW · not visible to the public</div><div class="hd"><span class="logo" aria-hidden="true"></span><b style="font-family:Cambria,Georgia,serif">NaViGate Bharat <span style="color:var(--saffron)">2.0</span></b><span class="muted" style="margin-left:auto;font-size:.8rem">Home · Videos · Categories</span></div><div class="bd">'+
+      '<div class="muted" style="font-size:.78rem;margin-bottom:6px">Videos / '+esc(it.catName)+'</div><video class="pv" controls preload="metadata" src="../assets/media/sample.mp4" aria-label="Staging video player"></video>'+
+      '<h3 style="margin:10px 0 4px;font-size:1.2rem">'+esc(it.title)+'</h3><div><span class="chip b">'+esc(it.catName)+'</span> <span class="chip">'+esc(it.lang)+'</span> <span class="chip">'+esc(it.dur||"—")+'</span></div>'+
+      '<p style="margin:10px 0 6px">'+esc(it.desc||"No description provided.")+'</p><div>'+(it.tags||[]).map(t=>'<span class="chip">#'+esc(t)+'</span>').join(" ")+'</div><div class="muted" style="font-size:.78rem;margin-top:8px">0 views · '+esc(it.date)+' · '+(it.captions===false?'No captions':'Captions available')+'</div></div></div>'+
+      '<div class="mact"><button class="btn" data-close>Close preview</button></div>');
+    const m=b.querySelector(".modal"); m.style.maxWidth="760px";
+  }
+  render();
+})();
+</script>
+</body></html>

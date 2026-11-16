@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · NaViGate CMS</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<style>
+body{background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 60%,#1d4a82 100%);min-height:100vh}
+.lg-wrap{min-height:calc(100vh - 30px);display:grid;place-items:center;padding:24px 16px}
+.lg{width:100%;max-width:440px;padding:26px 28px}
+.lg .brand{margin-bottom:6px}
+.lg h1{font-size:1.4rem;margin:14px 0 2px}
+.pw{display:flex;gap:6px}
+.pw button{white-space:nowrap}
+.cap{display:flex;gap:8px;align-items:center}
+.cap .q{background:var(--soft);border:1.5px dashed var(--blue);border-radius:8px;padding:8px 12px;font-family:Cambria,Georgia,serif;font-weight:700;font-size:1.05rem;letter-spacing:.08em;white-space:nowrap;user-select:none}
+.cap input{max-width:110px}
+.demo-note{display:flex;gap:8px;align-items:center;margin:12px 0 4px;font-size:.88rem}
+.quick{display:grid;gap:8px;margin-top:8px}
+.quick button{display:flex;justify-content:space-between;align-items:center;text-align:left;width:100%;padding:9px 12px;border:1.5px solid var(--line);background:var(--card);border-radius:8px;cursor:pointer;font:inherit;color:var(--ink)}
+.quick button:hover{border-color:var(--blue);background:var(--soft)}
+.quick button small{color:var(--muted);display:block}
+.msg{border-radius:8px;padding:9px 12px;font-size:.88rem;font-weight:600;margin:12px 0 0}
+.msg.err{background:#F8DAD6;color:#8e271d;border:1px solid #eeb5ae}
+.msg.ok{background:#DFF3EC;color:#0f5f4c;border:1px solid #b7e2d4}
+hr.sep{border:0;border-top:1px solid var(--line);margin:18px 0 6px}
+</style></head>
+<body>
+<div class="demo-banner">DEMONSTRATION PROTOTYPE by ADG Online Solutions Pvt. Ltd. · Sample content only</div>
+<main class="lg-wrap" id="main">
+ <div class="card lg">
+  <a class="brand" href="../index.html" aria-label="NaViGate Bharat 2.0 public portal"><span class="logo" aria-hidden="true"></span><span><b>NaViGate <span style="color:var(--saffron)">CMS</span></b><small>NaViGate Bharat 2.0 · content management</small></span></a>
+  <h1>Sign in</h1>
+  <div class="muted" style="font-size:.9rem">Role-based access with three roles: Super Admin, Inputter and Approver.</div>
+  <div id="msg" role="alert" aria-live="assertive"></div>
+  <form id="lf" novalidate autocomplete="on">
+   <label for="em">Email address</label>
+   <input id="em" name="email" type="email" autocomplete="username" aria-describedby="em-e em-h" placeholder="inputter@demo.adg">
+   <div class="ferr" id="em-e" role="alert"></div>
+   <div class="muted" id="em-h" style="font-size:.76rem">Use one of the three demo accounts below. Accounts that a Super Admin has deactivated cannot sign in.</div>
+   <label for="pw">Password</label>
+   <div class="pw"><input id="pw" name="password" type="password" autocomplete="current-password" aria-describedby="pw-e" placeholder="Password"><button type="button" class="btn sec sm" id="tg" aria-pressed="false" aria-label="Show password">Show</button></div>
+   <div class="ferr" id="pw-e" role="alert"></div>
+   <label for="cp">Security check</label>
+   <div class="cap"><span class="q" id="cq" aria-hidden="true"></span><input id="cp" inputmode="numeric" autocomplete="off" type="text" aria-describedby="cp-e" aria-label="Answer to the arithmetic question"><button type="button" class="btn sec sm" id="cr" aria-label="New security question">↻ New</button></div>
+   <div class="ferr" id="cp-e" role="alert"></div>
+   <label class="chk"><input type="checkbox" id="rm"> Remember me on this device</label>
+   <button class="btn" id="go" type="submit" style="width:100%;padding:11px">Sign in</button>
+   <div class="demo-note"><span class="chip o">Demo</span><span><b>Demo password for all accounts: Demo@1234</b></span></div>
+  </form>
+  <hr class="sep">
+  <div style="font-weight:700;font-size:.85rem">Quick-fill demo accounts</div>
+  <div class="quick" id="quick"></div>
+  <div style="margin-top:14px;font-size:.85rem"><a href="../index.html">Back to public portal</a></div>
+ </div>
+</main>
+<script src="../assets/js/data.js"></script><script src="../assets/js/app.js"></script>
+<script>
+(function(){
+  const A=ADG,D=A.D,$=A.$,esc=A.esc;
+  try{ localStorage.removeItem("adg_user"); }catch(e){}   /* visiting login = signing out */
+  let ans=0,fails=0,locked=false,timer=null;
+  const em=$("#em"),pw=$("#pw"),cp=$("#cp"),rm=$("#rm"),go=$("#go"),msg=$("#msg");
+  function newQ(){ const a=2+Math.floor(Math.random()*8),b=2+Math.floor(Math.random()*8); ans=a+b; $("#cq").textContent=a+" + "+b+" = ?"; cp.value=""; }
+  function setErr(id,t,inp){ $("#"+id).textContent=t||""; if(inp){ inp.classList.toggle("invalid",!!t); inp.setAttribute("aria-invalid",t?"true":"false"); } }
+  function clearErrs(){ setErr("em-e","",em); setErr("pw-e","",pw); setErr("cp-e","",cp); }
+  function say(t,cls){ msg.innerHTML=t?'<div class="msg '+cls+'">'+t+'</div>':""; }
+  const USERS=A.store.get("users",D.users);
+  USERS.forEach(u=>{
+    const b=document.createElement("button"); b.type="button";
+    b.innerHTML='<span><b>'+esc(u.name)+'</b><small>'+esc(u.email)+'</small></span><span class="chip '+(u.role==="Super Admin"?"b":u.role==="Inputter"?"o":"g")+'">'+esc(u.role)+'</span>';
+    b.setAttribute("aria-label","Fill demo account "+u.name+", "+u.role);
+    b.onclick=function(){ if(locked) return; em.value=u.email; pw.value=u.password||"Demo@1234"; clearErrs(); say("Filled "+esc(u.role)+" account. Answer the security check and sign in.","ok"); cp.focus(); };
+    $("#quick").appendChild(b);
+  });
+  $("#tg").onclick=function(){ const s=pw.type==="password"; pw.type=s?"text":"password"; this.textContent=s?"Hide":"Show"; this.setAttribute("aria-pressed",s); this.setAttribute("aria-label",s?"Hide password":"Show password"); };
+  $("#cr").onclick=newQ;
+  const rem=A.store.get("remember","");
+  if(rem){ em.value=rem; rm.checked=true; }
+  newQ();
+  function lock(){
+    locked=true; let s=30;
+    [em,pw,cp,rm,go,$("#cr"),$("#tg")].forEach(x=>x.disabled=true);
+    $("#quick").querySelectorAll("button").forEach(x=>x.disabled=true);
+    const tick=()=>{ say("Too many failed attempts. Sign-in is locked for <b>"+s+"</b> second"+(s===1?"":"s")+".","err"); if(s<=0){ clearInterval(timer); locked=false; fails=0; [em,pw,cp,rm,go,$("#cr"),$("#tg")].forEach(x=>x.disabled=false); $("#quick").querySelectorAll("button").forEach(x=>x.disabled=false); say("You can try again now.","ok"); newQ(); em.focus(); } s--; };
+    tick(); timer=setInterval(tick,1000);
+  }
+  $("#lf").addEventListener("submit",function(e){
+    e.preventDefault(); if(locked) return;
+    clearErrs(); say("");
+    const email=em.value.trim(); let bad=0,first=null;
+    if(!email){ setErr("em-e","Email is required.",em); bad++; first=first||em; }
+    else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ setErr("em-e","Enter a valid email address, for example inputter@demo.adg.",em); bad++; first=first||em; }
+    if(!pw.value){ setErr("pw-e","Password is required.",pw); bad++; first=first||pw; }
+    const c=cp.value.trim();
+    if(!c){ setErr("cp-e","Answer the security question.",cp); bad++; first=first||cp; }
+    else if(+c!==ans){ setErr("cp-e","Incorrect answer. A new question has been set.",cp); bad++; first=first||cp; newQ(); }
+    if(bad){
+      fails++; if(fails>=3){ lock(); return; }
+      say("Sign-in failed. "+(3-fails)+" attempt"+(3-fails===1?"":"s")+" left before a 30-second lockout.","err"); if(first) first.focus(); return;
+    }
+    const known=USERS.find(u=>u.email.toLowerCase()===email.toLowerCase());
+    if(!known||known.password!==pw.value||known.status!=="Active"){
+      fails++; if(fails>=3){ lock(); return; }
+      say(known&&known.status!=="Active"?"This account is deactivated. Contact a Super Admin.":"Wrong email or password. "+(3-fails)+" attempt"+(3-fails===1?"":"s")+" left before a 30-second lockout.","err"); newQ(); pw.focus(); return;
+    }
+    const user={name:known.name,role:known.role,email:known.email,id:known.id};
+    known.last=new Date().toISOString().slice(0,16).replace("T"," "); A.store.set("users",USERS);
+    A.store.set("user",user);
+    if(rm.checked) A.store.set("remember",email); else A.store.set("remember","");
+    say("Signed in as "+esc(user.name)+" ("+esc(user.role)+"). Redirecting...","ok"); go.disabled=true; go.textContent="Signing in...";
+    setTimeout(()=>{ location.href="dashboard.html"; },500);
+  });
+})();
+</script>
+</body></html>

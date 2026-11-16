@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>User management · NaViGate CMS</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{white-space:nowrap}
+.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin-bottom:12px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}@media(max-width:600px){.row2{grid-template-columns:1fr}}
+.hint{font-size:.78rem;color:var(--muted);margin-top:3px}
+.pwbox{display:flex;gap:6px}
+.pwbox input{font-family:Consolas,Menlo,monospace;font-weight:700;letter-spacing:.04em}
+.tmp{background:var(--soft);border:1.5px dashed var(--blue);border-radius:10px;padding:12px;margin-top:10px}
+.mx th.rl,.mx td.c{text-align:center}
+.mx td.c b{font-size:1rem}
+.mx .y{color:#0f5f4c}.mx .n{color:var(--muted)}
+body.hc .mx .y,body.hc .mx .n{color:#fff}
+.rc h3{font-size:1.1rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rc ul{margin:6px 0 10px 18px;padding:0;font-size:.88rem}
+.rc .lab{font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-top:8px}
+.sod{border-left:5px solid var(--blue);background:var(--soft);padding:12px 16px;border-radius:8px;font-size:.92rem;margin-bottom:14px}
+</style></head>
+<body>
+<div id="top"></div>
+<div id="app"></div>
+<script src="../assets/js/data.js"></script><script src="../assets/js/app.js"></script><script src="core-lib.js"></script>
+<script>
+document.getElementById("top").innerHTML=ADG.topbar("User management","Accounts, roles, temporary passwords and the permission matrix");
+ADG.admin({active:"users"});
+(function(){
+  const A=ADG,C=CORE,D=A.D,$=A.$,esc=A.esc,S=A.store;
+  const me=C.user(), app=$("#app");
+  if(!A.can("users.manage")){
+    app.innerHTML='<section class="card" role="alert" aria-labelledby="adT" style="max-width:640px"><h2 id="adT" style="font-size:1.3rem">Access denied</h2><p>User management is available to the <b>Super Admin</b> role only. You are signed in as <b>'+esc(me.role||"unknown")+'</b>, which does not include the permission to manage users, roles or passwords.</p><p><a class="btn" href="dashboard.html">Back to dashboard</a></p></section>';
+    return;
+  }
+  const MAX=6, ROLES=["Super Admin","Inputter","Approver"];
+  const RCHIP={"Super Admin":"b","Inputter":"o","Approver":"g"};
+  const RDESC={
+    "Super Admin":{tag:"The administrator",can:["Manage users, roles and passwords","Edit any content metadata, unpublish and delete content","Edit and delete stations and PSA films, import bulk data","Change settings and view the full audit log"],cannot:["Upload or submit content","Approve, publish or promote to live (no self-approval path)"]},
+    "Inputter":{tag:"The maker",can:["Upload and create content, edit own drafts and returned items","Submit content for approval","Create and edit stations, PSA films and bulk imports"],cannot:["Approve, publish, delete or promote to live","See user management or the audit log"]},
+    "Approver":{tag:"The checker",can:["Approve or return submissions, publish and unpublish","Promote staging to live","Decide award nominations and approve PSA films and stations","Read the audit log"],cannot:["Upload or edit content","Manage users or change settings"]}
+  };
+  function load(){ let l=S.get("users",null); if(!Array.isArray(l)||!l.length){ l=D.users.map(u=>Object.assign({},u)); S.set("users",l); } return l; }
+  const save=l=>S.set("users",l);
+  const isMe=u=>(u.email||"").toLowerCase()===(me.email||"").toLowerCase()||(me.id&&u.id===me.id);
+  const activeSA=l=>l.filter(u=>u.role==="Super Admin"&&u.status==="Active").length;
+  const has=(r,p)=>{ const a=A.PERMS[r]||[]; return a.indexOf(p)>=0||(p==="content.edit.own"&&a.indexOf("content.edit")>=0); };
+  const mdl=C.modal;
+
+  app.innerHTML=
+   '<div class="note" role="note" style="margin-bottom:16px"><b>Super Admin.</b> You can add and edit users, deactivate or reactivate accounts and reset passwords here. You cannot approve or publish content, and you cannot deactivate or demote your own account.</div>'+
+   '<section class="card" aria-labelledby="uT"><div class="toolbar"><div><h2 id="uT" style="font-size:1.2rem;margin:0">Users</h2><div class="muted" id="uCnt" aria-live="polite" style="font-size:.85rem"></div></div><button class="btn" id="addU">+ Add user</button></div>'+
+   '<div class="tbl-wrap"><table class="t" aria-label="Users"><thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Last login</th><th scope="col">Created</th><th scope="col">Actions</th></tr></thead><tbody id="uRows"></tbody></table></div></section>'+
+   '<div class="sec-title"><h2>Role and permission matrix</h2></div>'+
+   '<div class="sod"><b>Separation of duties (maker-checker).</b> The Inputter is the maker who creates and submits content, stations and PSA films. The Approver is the checker who approves, returns, publishes and promotes to live. The Super Admin administers users, roles, settings and master data but cannot approve or publish, so no single person can create and approve the same item.</div>'+
+   '<div class="card" style="padding:0"><div class="tbl-wrap" style="border:0"><table class="t mx" aria-label="Role and permission matrix"><caption class="sr-only">Permissions granted to each role. A tick with the word Yes means allowed; a dash with the word No means not allowed.</caption><thead><tr><th scope="col" style="min-width:260px">Permission</th>'+ROLES.map(r=>'<th scope="col" class="rl">'+esc(r)+'</th>').join("")+'</tr></thead><tbody>'+
+     A.PERM_LABELS.map(x=>'<tr><th scope="row" style="background:transparent;color:var(--ink);font-weight:600;font-size:.9rem">'+esc(x[1])+'<div class="muted" style="font-size:.72rem;font-weight:400">'+esc(x[0])+'</div></th>'+ROLES.map(r=>has(r,x[0])?'<td class="c y"><b aria-hidden="true">✓</b> Yes<span class="sr-only"> allowed for '+esc(r)+'</span></td>':'<td class="c n"><b aria-hidden="true">—</b> No<span class="sr-only"> not allowed for '+esc(r)+'</span></td>').join("")+'</tr>').join("")+
+   '</tbody></table></div></div>'+
+   '<div class="sec-title"><h2>Role summary</h2></div><div class="grid g3" id="roles"></div>';
+
+  function render(){
+    const l=load();
+    $("#uCnt").textContent=l.length+" of "+MAX+" demo accounts used";
+    const add=$("#addU"), full=l.length>=MAX;
+    add.disabled=full; add.setAttribute("aria-disabled",full); add.title=full?"The demo allows up to "+MAX+" users":"Add a new user";
+    $("#uRows").innerHTML=l.map(u=>{
+      const self=isMe(u), act=u.status==="Active", lastSA=u.role==="Super Admin"&&act&&activeSA(l)<=1;
+      let dis="", dt=act?"Deactivate":"Reactivate";
+      if(act&&self) dis=' disabled aria-disabled="true" title="You cannot deactivate your own account"';
+      else if(act&&lastSA) dis=' disabled aria-disabled="true" title="At least one active Super Admin is required"';
+      return '<tr><td><b>'+esc(u.name)+'</b>'+(self?' <span class="chip b">You</span>':'')+'</td><td>'+esc(u.email)+'</td><td><span class="chip '+(RCHIP[u.role]||"")+'">'+esc(u.role)+'</span></td><td><span class="chip '+(act?"g":"r")+'">'+esc(u.status)+'</span></td><td>'+esc(u.last||"Never")+'</td><td>'+esc(u.created||"")+'</td><td><div class="acts"><button class="btn sec sm" data-act="edit" data-id="'+esc(u.id)+'" aria-label="Edit '+esc(u.name)+'">Edit</button><button class="btn '+(act?"warn":"ok")+' sm" data-act="toggle" data-id="'+esc(u.id)+'"'+dis+' aria-label="'+dt+' '+esc(u.name)+'">'+dt+'</button><button class="btn sec sm" data-act="reset" data-id="'+esc(u.id)+'" aria-label="Reset password for '+esc(u.name)+'">Reset password</button></div></td></tr>';
+    }).join("");
+    $("#roles").innerHTML=ROLES.map(r=>{ const n=l.filter(u=>u.role===r&&u.status==="Active").length, d=RDESC[r], np=A.PERM_LABELS.filter(x=>has(r,x[0])).length;
+      return '<section class="card rc" aria-labelledby="rc-'+r.replace(/\s/g,"")+'"><h3 id="rc-'+r.replace(/\s/g,"")+'"><span class="chip '+RCHIP[r]+'">'+esc(r)+'</span> '+esc(d.tag)+'</h3><div class="muted" style="font-size:.85rem">'+n+' active user'+(n===1?"":"s")+' · '+np+' of '+A.PERM_LABELS.length+' permissions</div><div class="lab">Can</div><ul>'+d.can.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul><div class="lab">Cannot</div><ul>'+d.cannot.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul></section>'; }).join("");
+  }
+
+  function setErr(bg,id,inp,m){ const e=bg.querySelector("#"+id), i=bg.querySelector(inp); e.textContent=m||""; i.classList.toggle("invalid",!!m); i.setAttribute("aria-invalid",m?"true":"false"); return m?1:0; }
+  function genPw(){
+    const U="ABCDEFGHJKLMNPQRSTUVWXYZ",L="abcdefghijkmnopqrstuvwxyz",N="23456789",X="@#$%&*!?",all=U+L+N+X;
+    const buf=new Uint32Array(14); (window.crypto||window.msCrypto).getRandomValues(buf);
+    const pick=(s,i)=>s[buf[i]%s.length]; const out=[pick(U,0),pick(L,1),pick(N,2),pick(X,3)];
+    for(let i=4;i<12;i++) out.push(pick(all,i));
+    for(let i=out.length-1;i>0;i--){ const j=buf[12+(i%2)]%(i+1); const t=out[i]; out[i]=out[j]; out[j]=t; }
+    return out.join("");
+  }
+  const pwOk=p=>p.length>=8&&/[a-z]/.test(p)&&/[A-Z]/.test(p)&&/[0-9]/.test(p);
+  function copy(txt,btn){ const done=()=>{ btn.textContent="Copied"; setTimeout(()=>{btn.textContent="Copy";},1500); };
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done,()=>A.toast("Copy failed: select the password and copy it manually")); else A.toast("Copy not available: select the password and copy it manually"); }
+  const roleOpts=sel=>ROLES.map(r=>'<option'+(r===sel?" selected":"")+'>'+r+'</option>').join("");
+
+  /* ---- add ---- */
+  function addDlg(){
+    if(!A.can("users.manage")) return;
+    if(load().length>=MAX){ A.toast("The demo allows up to "+MAX+" users."); return; }
+    mdl('<h2 id="adU">Add user</h2><form id="af" novalidate><label for="aN">Full name *</label><input type="text" id="aN" maxlength="60" autocomplete="off"><div class="ferr" id="aNe" role="alert"></div><label for="aE">Email address *</label><input type="email" id="aE" autocomplete="off" placeholder="name@demo.adg"><div class="ferr" id="aEe" role="alert"></div><label for="aR">Role *</label><select id="aR">'+roleOpts("Inputter")+'</select><label for="aP">Temporary password *</label><div class="pwbox"><input type="text" id="aP" autocomplete="off"><button type="button" class="btn sec sm" id="aG">Generate</button></div><div class="ferr" id="aPe" role="alert"></div><div class="hint">At least 8 characters with upper case, lower case and a number. Share it with the user securely.</div><div class="mact"><button type="button" class="btn sec" data-close>Cancel</button><button type="submit" class="btn">Add user</button></div></form>',bg=>{
+      const g=i=>bg.querySelector(i);
+      g("#aG").onclick=()=>{ g("#aP").value=genPw(); g("#aPe").textContent=""; g("#aP").classList.remove("invalid"); };
+      g("#af").onsubmit=e=>{ e.preventDefault();
+        if(!A.can("users.manage")) return;
+        const l=load(), n=g("#aN").value.trim(), em=g("#aE").value.trim(), r=g("#aR").value, p=g("#aP").value;
+        let bad=0;
+        bad+=setErr(bg,"aNe","#aN",!n?"Full name is required.":n.length<2?"Enter at least 2 characters.":"");
+        bad+=setErr(bg,"aEe","#aE",!em?"Email is required.":!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)?"Enter a valid email address.":l.some(u=>(u.email||"").toLowerCase()===em.toLowerCase())?"A user with this email already exists.":"");
+        bad+=setErr(bg,"aPe","#aP",!p?"A temporary password is required.":!pwOk(p)?"Use at least 8 characters with upper case, lower case and a number.":"");
+        if(ROLES.indexOf(r)<0) bad++;
+        if(bad){ const f=bg.querySelector(".invalid"); if(f) f.focus(); return; }
+        if(l.length>=MAX){ A.toast("The demo allows up to "+MAX+" users."); return; }
+        const id="U-"+(Math.max(0,...l.map(u=>+String(u.id).replace(/\D/g,"")||0))+1);
+        l.push({id:id,name:n,role:r,email:em,password:p,status:"Active",created:C.isoDate(),last:""});
+        save(l); C.audit("User created",n+" ("+em+")","Role: "+r+"; temporary password issued");
+        bg.remove(); render(); A.toast("User added: "+n);
+      };
+    });
+  }
+
+  /* ---- edit ---- */
+  function editDlg(id){
+    if(!A.can("users.manage")) return;
+    const l=load(), u=l.find(x=>x.id===id); if(!u) return;
+    const self=isMe(u), lastSA=u.role==="Super Admin"&&u.status==="Active"&&activeSA(l)<=1, lock=self||lastSA;
+    mdl('<h2 id="edU">Edit user</h2><form id="ef" novalidate><label for="eN">Full name *</label><input type="text" id="eN" maxlength="60" value="'+esc(u.name)+'"><div class="ferr" id="eNe" role="alert"></div><label for="eE">Email address</label><input type="email" id="eE" value="'+esc(u.email)+'" disabled aria-disabled="true"><div class="hint">The email is the sign-in name and cannot be changed.</div><label for="eR">Role *</label><select id="eR"'+(lock?' disabled aria-disabled="true"':'')+'>'+roleOpts(u.role)+'</select>'+(lock?'<div class="hint">'+(self?"You cannot change the role of your own account.":"At least one active Super Admin is required, so this role cannot be changed.")+'</div>':'')+'<div class="mact"><button type="button" class="btn sec" data-close>Cancel</button><button type="submit" class="btn">Save changes</button></div></form>',bg=>{
+      const g=i=>bg.querySelector(i);
+      g("#ef").onsubmit=e=>{ e.preventDefault();
+        if(!A.can("users.manage")) return;
+        const l2=load(), t=l2.find(x=>x.id===id); if(!t) return;
+        const n=g("#eN").value.trim(); let r=g("#eR").value;
+        if(setErr(bg,"eNe","#eN",!n?"Full name is required.":n.length<2?"Enter at least 2 characters.":"")){ g("#eN").focus(); return; }
+        const selfNow=isMe(t), lastNow=t.role==="Super Admin"&&t.status==="Active"&&activeSA(l2)<=1;
+        if((selfNow||lastNow)&&r!==t.role){ A.toast(selfNow?"You cannot change the role of your own account.":"At least one active Super Admin is required."); return; }
+        if(ROLES.indexOf(r)<0) return;
+        const ch=[]; if(n!==t.name) ch.push("Name: "+t.name+" → "+n); if(r!==t.role) ch.push("Role: "+t.role+" → "+r);
+        if(!ch.length){ bg.remove(); A.toast("No changes to save."); return; }
+        const old=t.name; t.name=n; t.role=r; save(l2);
+        if(selfNow){ const su=S.get("user",null); if(su){ su.name=n; S.set("user",su); } }
+        C.audit("User edited",old+" ("+t.email+")",ch.join("; "));
+        bg.remove(); render(); A.toast("User updated: "+n);
+      };
+    });
+  }
+
+  /* ---- deactivate / reactivate ---- */
+  function toggleUser(id){
+    if(!A.can("users.manage")) return;
+    const l=load(), u=l.find(x=>x.id===id); if(!u) return;
+    const act=u.status==="Active";
+    if(act){
+      if(isMe(u)){ A.toast("You cannot deactivate your own account."); return; }
+      if(u.role==="Super Admin"&&activeSA(l)<=1){ A.toast("At least one active Super Admin is required."); return; }
+    }
+    C.confirm({title:(act?"Deactivate":"Reactivate")+" user?",ok:act?"Deactivate":"Reactivate",cls:act?"warn":"ok",
+      msg:act?'<b>'+esc(u.name)+'</b> ('+esc(u.role)+') will no longer be able to sign in until the account is reactivated. This is recorded in the audit trail.':'<b>'+esc(u.name)+'</b> ('+esc(u.role)+') will be able to sign in again. This is recorded in the audit trail.',
+      onOk:function(){
+        if(!A.can("users.manage")) return;
+        const l2=load(), t=l2.find(x=>x.id===id); if(!t) return;
+        if(t.status==="Active"&&(isMe(t)||(t.role==="Super Admin"&&activeSA(l2)<=1))) return;
+        t.status=act?"Inactive":"Active"; save(l2);
+        C.audit(act?"User deactivated":"User reactivated",t.name+" ("+t.email+")","Role: "+t.role);
+        render(); A.toast(t.name+" is now "+t.status.toLowerCase());
+      }});
+  }
+
+  /* ---- reset password ---- */
+  function resetDlg(id){
+    if(!A.can("users.manage")) return;
+    const u0=load().find(x=>x.id===id); if(!u0) return;
+    mdl('<h2 id="rpU">Reset password</h2><p>Generate a new random temporary password for <b>'+esc(u0.name)+'</b> ('+esc(u0.email)+'). The previous password stops working immediately.</p><div id="rpArea"><div class="mact"><button type="button" class="btn sec" data-close>Cancel</button><button type="button" class="btn warn" id="rpGo">Generate and save</button></div></div><div class="hint" id="rpH"></div>',bg=>{
+      bg.querySelector("#rpGo").onclick=()=>{
+        if(!A.can("users.manage")) return;
+        const l=load(), t=l.find(x=>x.id===id); if(!t) return;
+        const pw=genPw(); t.password=pw; save(l);
+        C.audit("Password reset",t.name+" ("+t.email+")","Temporary password issued (value not recorded)");
+        bg.querySelector("#rpArea").innerHTML='<div class="tmp"><label for="rpV" style="margin-top:0">Temporary password for '+esc(t.name)+'</label><div class="pwbox"><input type="text" id="rpV" readonly value="'+esc(pw)+'"><button type="button" class="btn sec sm" id="rpC">Copy</button></div></div><div class="mact"><button type="button" class="btn" data-close id="rpD">Done</button></div>';
+        bg.querySelector("#rpH").innerHTML='<b>Shown once.</b> Copy it now: it cannot be viewed again after you close this window.';
+        bg.querySelector("#rpC").onclick=function(){ copy(pw,this); };
+        bg.querySelector("#rpD").onclick=()=>bg.remove();
+        bg.querySelector("#rpV").focus(); bg.querySelector("#rpV").select();
+        render(); A.toast("Password reset for "+t.name);
+      };
+    });
+  }
+
+  $("#addU").onclick=addDlg;
+  app.addEventListener("click",ev=>{
+    const b=ev.target.closest("button[data-act]"); if(!b||b.disabled||b.getAttribute("aria-disabled")==="true") return;
+    const a=b.dataset.act, id=b.dataset.id;
+    if(a==="edit") editDlg(id); else if(a==="toggle") toggleUser(id); else if(a==="reset") resetDlg(id);
+  });
+  render();
+})();
+</script>
+</body></html>

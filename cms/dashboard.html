@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dashboard · NaViGate CMS</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<style>
+[hidden]{display:none!important}
+.dg{display:grid;gap:18px;grid-template-columns:2fr 1fr}@media(max-width:900px){.dg{grid-template-columns:1fr}}
+.qa{display:flex;flex-wrap:wrap;gap:10px}
+.feed{list-style:none;margin:0;padding:0}
+.feed li{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.9rem}
+.feed li:last-child{border-bottom:0}
+.feed .dot{flex:0 0 34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--soft);font-size:1rem}
+.feed small{color:var(--muted);display:block}
+.stg{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.pulse{width:12px;height:12px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px #DFF3EC}
+.pulse.w{background:var(--saffron);box-shadow:0 0 0 4px #FCE9D2}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.88rem;margin:12px 0}
+.kv dt{color:var(--muted);font-weight:600}.kv dd{margin:0}
+#roleNote .note{margin-bottom:16px}
+</style></head>
+<body>
+<div id="top"></div>
+<div id="roleNote"></div>
+<div class="grid g4" id="stats" style="margin-bottom:18px"></div>
+<div class="dg">
+  <section class="card" aria-labelledby="chT"><h2 id="chT" style="font-size:1.15rem">Uploads per month</h2><div class="muted" style="font-size:.82rem;margin-bottom:6px">Videos submitted through the CMS, last 12 months</div><div id="chart"></div></section>
+  <section class="card" aria-labelledby="qaT"><h2 id="qaT" style="font-size:1.15rem">Quick actions</h2><div class="muted" style="font-size:.82rem;margin-bottom:10px" id="qaSub"></div><div class="qa" id="qa"></div></section>
+</div>
+<div id="sysov"></div>
+<div class="grid g2" style="margin-top:18px">
+  <section class="card" aria-labelledby="stT"><h2 id="stT" style="font-size:1.15rem">Staging environment</h2>
+    <div class="stg"><span class="pulse" id="pulse" aria-hidden="true"></span><b id="stTxt" style="font-size:1.05rem"></b></div>
+    <dl class="kv"><dt>Environment</dt><dd>Staging at NMW</dd><dt>Last promoted</dt><dd id="lastP">10 Nov 2026, 10:12 by Anita Rao</dd><dt>Awaiting promotion</dt><dd id="awaiting">0 items</dd></dl>
+    <button class="btn warn" id="promote" hidden>Promote to live</button> <span class="muted" id="promNote" style="font-size:.82rem"></span>
+  </section>
+  <section class="card" aria-labelledby="acT"><h2 id="acT" style="font-size:1.15rem">Recent activity</h2><div class="muted" id="feedNote" style="font-size:.8rem;margin-bottom:6px"></div><ul class="feed" id="feed"></ul><a href="approvals.html" id="feedLink" style="font-size:.88rem">Open approvals board</a></section>
+</div>
+<script src="../assets/js/data.js"></script><script src="../assets/js/app.js"></script><script src="core-lib.js"></script>
+<script>
+document.getElementById("top").innerHTML=ADG.topbar("Dashboard","Content operations overview");
+ADG.admin({active:"dashboard"});
+(function(){
+  const A=ADG,C=CORE,$=A.$,esc=A.esc,S=A.store;
+  const u=C.user(), R=A.role(), first=(u.name||"").split(" ")[0];
+  const isIn=R==="Inputter", isAp=R==="Approver", isSA=R==="Super Admin";
+  const hr=new Date().getHours(), g=hr<12?"Good morning":hr<17?"Good afternoon":"Good evening";
+  $(".topbar h1").textContent=g+", "+first;
+  const BANNER={
+    "Inputter":"<b>Inputter.</b> You can upload content, edit your own drafts and returned items, and submit them for approval. You cannot approve, publish, delete or promote to live.",
+    "Approver":"<b>Approver.</b> You review submissions, publish and unpublish content, and promote staging to live. You cannot upload or edit content or manage users.",
+    "Super Admin":"<b>Super Admin.</b> You manage users, settings and the audit log, and can edit metadata, unpublish and delete content. You cannot upload, approve, publish or promote to live (separation of duties)."
+  };
+  $("#roleNote").innerHTML='<div class="note" role="note">'+(BANNER[R]||"<b>Role not recognised.</b> Sign in again with one of the three demo accounts.")+'</div>';
+  function stat(l,v,sub){ return '<div class="stat"><span>'+l+'</span><b>'+v+'</b><span>'+sub+'</span></div>'; }
+  function render(){
+    const items=C.items(), ups=C.uploads();
+    const wf=items.concat(C.apprItems().filter(i=>i.source==="seed"));
+    const cnt=s=>wf.filter(i=>i.status===s).length;
+    const pub=items.filter(i=>i.status==="Published").length, pend=C.pendingCount(), staged=C.staged().length;
+    const mine=wf.filter(i=>i.by===u.name), my=s=>mine.filter(i=>i.status===s).length;
+    const used=412+ups.reduce((a,x)=>a+(+x.size||0),0)/1e9, pct=Math.min(100,used/1000*100);
+    const users=S.get("users",A.D.users), uc=Array.isArray(users)?users:[];
+    const storage='<div class="stat"><span>Storage used</span><b>'+used.toFixed(1)+' GB</b><div class="bar" style="margin:6px 0 4px" role="progressbar" aria-valuemin="0" aria-valuemax="1000" aria-valuenow="'+Math.round(used)+'" aria-label="Storage used"><i style="width:'+pct.toFixed(1)+'%"></i></div><span>'+pct.toFixed(1)+'% of 1 TB</span></div>';
+    let st;
+    if(isIn) st=stat("My drafts",my("Draft"),my("Draft")?"Submit them from the library":"No drafts")+stat("Returned for changes",my("Returned"),my("Returned")?'<a href="approvals.html">Fix and resubmit</a>':"Nothing returned")+stat("My pending approvals",my("Pending approval"),"Waiting for an Approver")+stat("Videos published",pub,"of "+items.length+" in library");
+    else if(isAp) st=stat("Pending review queue",pend,pend?'<a href="approvals.html">Review now</a>':"All clear")+stat("Awaiting promotion",staged,"Approved items on staging")+stat("Videos published",pub,"of "+items.length+" in library")+stat("Unpublished",cnt("Unpublished"),"Hidden from the public portal");
+    else if(isSA) st=stat("Users",uc.length,uc.filter(x=>x.status==="Active").length+" active")+stat("Videos published",pub,"of "+items.length+" in library")+storage+stat("Audit entries",C.auditList().length,'<a href="audit.html">Open audit log</a>');
+    else st=stat("Videos published",pub,"of "+items.length+" in library");
+    $("#stats").innerHTML=st;
+    if(isSA){
+      const byRole={}; uc.forEach(x=>{ byRole[x.role]=(byRole[x.role]||0)+1; });
+      $("#sysov").innerHTML='<section class="card" aria-labelledby="ovT" style="margin-top:18px"><h2 id="ovT" style="font-size:1.15rem">System overview</h2><dl class="kv"><dt>Users by role</dt><dd>'+(Object.keys(byRole).map(r=>esc(r)+' '+byRole[r]).join(" · ")||"None")+'</dd><dt>Library</dt><dd>'+items.length+' videos: '+pub+' published, '+cnt("Unpublished")+' unpublished, '+cnt("Draft")+' draft</dd><dt>Workflow</dt><dd>'+cnt("Pending approval")+' pending approval, '+cnt("Approved")+' approved, '+cnt("Returned")+' returned (read-only for you)</dd><dt>Staging</dt><dd>'+staged+' change'+(staged===1?"":"s")+' awaiting promotion by an Approver</dd></dl><a href="users.html">User management</a> · <a href="audit.html">Audit log</a></section>';
+    } else $("#sysov").innerHTML="";
+    const vals=[18,22,25,21,30,34,29,38,41,36,44,27+ups.length];
+    A.bars($("#chart"),A.D.analytics.months,vals,{h:230,color:"#2F6DB5",yfmt:v=>Math.round(v),label:"Uploads per month, last 12 months"});
+    $("#pulse").className="pulse"+(staged?" w":"");
+    $("#stTxt").textContent=staged?"Staging at NMW: "+staged+" change"+(staged>1?"s":"")+" ready to promote":"Staging at NMW: in sync";
+    $("#awaiting").textContent=staged+" item"+(staged===1?"":"s");
+    const lp=S.get("lastPromoted",null); if(lp) $("#lastP").textContent=lp;
+    const canP=A.can("staging.promote"), pb=$("#promote");
+    pb.hidden=!canP; $("#promNote").textContent=canP?"":"Only an Approver can promote staging to live.";
+    $("#qaSub").textContent="Signed in as "+u.role;
+    let qa="";
+    if(isIn) qa='<a class="btn" href="upload.html">Upload video</a><a class="btn sec" href="library.html">My drafts and library</a><a class="btn sec" href="approvals.html">Returned items ('+my("Returned")+')</a><a class="btn sec" href="approvals.html">Approvals board</a>';
+    else if(isAp) qa='<a class="btn ok" href="approvals.html">Approve pending ('+pend+')</a>'+(canP?'<button class="btn warn" id="qprom" type="button">Promote to live</button>':'')+'<a class="btn sec" href="library.html">Publish or unpublish in library</a><a class="btn sec" href="audit.html">Audit log</a>';
+    else if(isSA) qa='<a class="btn" href="users.html">User management</a><a class="btn sec" href="audit.html">Audit log</a><a class="btn sec" href="library.html">Content library</a><a class="btn sec" href="approvals.html">Approvals board (read-only)</a>';
+    else qa='<a class="btn sec" href="library.html">Content library</a>';
+    $("#qa").innerHTML=qa;
+    const q=$("#qprom"); if(q) q.onclick=promote;
+    const icons={"Approved":"✅","Returned":"↩️","Published":"🌐","Submitted for approval":"📤","Resubmitted for approval":"📤","Promoted to live":"🚀","Unpublished":"⏸️","Deleted":"🗑️","Edited":"✏️"};
+    let l=C.auditList();
+    if(!A.can("audit.view")){ l=l.filter(e=>e.actor===u.name); $("#feedLink").textContent="Open approvals board"; $("#feedLink").href="approvals.html"; $("#feedNote").textContent="Showing your own activity only. The full audit log is not available to your role."; }
+    else { $("#feedLink").textContent="Open full audit log"; $("#feedLink").href="audit.html"; $("#feedNote").textContent=""; }
+    l=l.slice(0,7);
+    $("#feed").innerHTML=l.length?l.map(e=>'<li><span class="dot" aria-hidden="true">'+(icons[e.action]||"🔔")+'</span><span><b>'+esc(e.actor)+'</b> '+esc(e.action.toLowerCase())+' <i>'+esc(e.item)+'</i>'+(e.note?'<small>"'+esc(e.note)+'"</small>':'')+'<small>'+esc(e.at)+' · '+esc(e.role)+'</small></span></li>').join(""):'<li>No activity yet.</li>';
+  }
+  function promote(){
+    if(!A.can("staging.promote")) return;
+    const n=C.staged().length;
+    C.confirm({title:"Promote to live?",ok:"Promote to live",cls:"warn",
+      msg:n?'This publishes <b>'+n+' approved change'+(n>1?'s':'')+'</b> from the NMW staging environment to the public portal. This action is recorded in the audit trail.':'Staging is already in sync with live. Promoting again re-publishes the current snapshot. This action is recorded in the audit trail.',
+      onOk:function(){
+        if(!A.can("staging.promote")) return;
+        const when=C.now()+" by "+u.name;
+        S.set("lastPromoted",when); S.set("staged",[]);
+        C.audit("Promoted to live","Staging snapshot ("+n+" change"+(n===1?"":"s")+")");
+        A.toast("Promoted to live. Staging and live are in sync."); render();
+      }});
+  }
+  $("#promote").onclick=promote;
+  render();
+})();
+</script>
+</body></html>

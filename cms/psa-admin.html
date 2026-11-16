@@ -1,0 +1,121 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PSA Compliance Admin · NaViGate CMS</title><link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.tblwrap{overflow-x:auto}
+.acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.toolbar{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:12px}
+.toolbar>div{min-width:160px}
+.err{color:var(--red);font-size:.8rem;font-weight:700;margin-top:3px}
+.invalid{border-color:var(--red)!important}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}@media(max-width:600px){.row2{grid-template-columns:1fr}}
+.rule{border-left:5px solid var(--blue);background:var(--soft);padding:12px 16px;border-radius:8px;font-size:.9rem}
+.rule ol{margin:6px 0 0 18px;padding:0}
+.btn[disabled],.btn[aria-disabled=true]{opacity:.5;cursor:not-allowed}
+input[type=checkbox]{width:18px;height:18px}
+[hidden]{display:none!important}
+.main{min-width:0}
+</style></head><body>
+<div id="tb"></div>
+<div class="note" id="roleNote" role="note" style="margin-bottom:16px"></div>
+
+<div class="grid g2">
+ <div class="card"><h2 style="font-size:1.15rem">Mandatory screening window</h2><p class="muted" style="margin-top:0;font-size:.88rem">Exhibitors must screen the active PSA before every show during this window.</p>
+  <form id="wf" novalidate><div class="row2"><div><label for="wFrom">From</label><input type="date" id="wFrom"></div><div><label for="wTo">To</label><input type="date" id="wTo"></div></div><div class="err" id="wErr" role="alert"></div><div style="margin-top:12px"><button class="btn" type="submit" id="wSave">Save window</button></div></form></div>
+ <div class="card"><h2 style="font-size:1.15rem">Auto-archive rule</h2>
+  <div class="rule"><b>How it works</b><ol><li>Every PSA has a valid-till date set by CBFC.</li><li>From the day after that date the PSA is shown as <b>Archived</b> on the public portal and cannot be scheduled.</li><li>"Run archival now" also updates the stored record and keeps it in the library for audit.</li></ol></div>
+  <div style="display:flex;gap:12px;align-items:center;margin-top:12px;flex-wrap:wrap"><button class="btn warn" id="arch">Run archival now</button><span class="muted" id="due" aria-live="polite"></span></div></div>
+</div>
+
+<div class="sec-title"><h2>PSA films</h2><button class="btn" id="addP">+ Create PSA film</button></div>
+<div class="card"><div class="tblwrap"><table class="t" aria-label="PSA films"><thead><tr><th>ID</th><th>Title</th><th>Topic</th><th>Valid till</th><th>File</th><th>Status</th><th>Actions</th></tr></thead><tbody id="pRows"></tbody></table></div></div>
+
+<div class="sec-title"><h2>Exhibitor compliance</h2><div class="muted" id="eCnt" aria-live="polite"></div></div>
+<div class="card">
+ <div class="toolbar"><div><label for="eR">Region</label><select id="eR"><option value="">All regions</option></select></div><div><label for="eS">Screening</label><select id="eS"><option value="">All</option><option>Confirmed</option><option>Pending</option></select></div><div><label for="eQ">Search</label><input type="search" id="eQ" placeholder="Exhibitor name"></div>
+  <div style="min-width:0;display:flex;gap:8px;flex-wrap:wrap;margin-left:auto"><button class="btn sec" id="selP">Select all pending</button><button class="btn warn" id="remind">Send reminder (0)</button><button class="btn" id="exp">Export CSV</button></div></div>
+ <div class="tblwrap"><table class="t" aria-label="Exhibitor compliance"><thead><tr><th><input type="checkbox" id="all" aria-label="Select all listed exhibitors"></th><th>Exhibitor</th><th>Region</th><th>Screening</th><th style="min-width:150px">Score</th><th>Reminders sent</th></tr></thead><tbody id="eRows"></tbody></table></div>
+ <div style="margin-top:10px"><button class="btn sec sm" id="expP">Export PSA library CSV</button></div>
+</div>
+<script src="../assets/js/data.js"></script><script src="../assets/js/app.js"></script><script src="core-lib.js"></script>
+<script>
+document.getElementById("tb").innerHTML=ADG.topbar("PSA compliance administration","PSA films, mandatory screening window, archival and exhibitor compliance");
+ADG.admin({active:"psaadm"});
+(function(){
+const {D,$,$$,store,toast,esc}=ADG, C=CORE, TODAY="2026-11-15", DAY=864e5;
+const role=ADG.role()||"Unknown", can=p=>ADG.can(p);
+const BANNER={
+ "Inputter":"You can create and edit PSA films (new films wait for Approver approval), set the screening window, run archival and send reminders. You cannot approve or delete PSA films.",
+ "Approver":"You can approve new PSA films. You cannot create or edit films, change the screening window, run archival, send reminders or delete.",
+ "Super Admin":"You can create, edit and delete PSA films, set the screening window, run archival and send reminders; new films still need Approver approval. You cannot approve PSA films."
+};
+$("#roleNote").innerHTML="<b>"+esc(role)+".</b> "+esc(BANNER[role]||"Your role has no access to PSA administration.");
+const WHY={edit:"Only an Inputter or Super Admin can change PSA data",decide:"Only an Approver can approve PSA films",del:"Only a Super Admin can delete PSA films"};
+const dis=(ok,why)=>ok?"":' disabled aria-disabled="true" title="'+esc(why)+'"';
+const lock=(el,ok,why)=>{el.disabled=!ok;el.setAttribute("aria-disabled",!ok);if(!ok)el.title=why;else el.removeAttribute("title");};
+const mdl=C.modal;
+const getP=()=>store.get("psa_list",null)||D.psas.map(p=>Object.assign({},p));
+const setP=l=>store.set("psa_list",l);
+const getPend=()=>{const p=store.get("psa_pending",[]);return Array.isArray(p)?p:[];};
+const setPend=l=>store.set("psa_pending",l);
+const allP=()=>getPend().map(p=>Object.assign({},p,{pending:true})).concat(getP());
+const num=id=>+String(id).replace(/\D/g,"")||0;
+const days=d=>Math.round((new Date(d)-new Date(TODAY))/DAY);
+const expired=p=>p.validTill<TODAY&&p.status!=="Archived";
+function effS(p){if(p.pending)return"Pending approval";if(p.status==="Archived")return"Archived";return days(p.validTill)<=30&&p.validTill>=TODAY?"Expiring":"Active";}
+const SC={Active:"g",Expiring:"o",Archived:"","Pending approval":"o"};
+const TOPICS=["Anti-tobacco","Road safety","Anti-piracy","Swachhta","Health","Cyber safety","Women safety","Environment"];
+
+/* window */
+const w=store.get("psa_window",{from:"2026-11-01",to:"2026-11-30"});$("#wFrom").value=w.from;$("#wTo").value=w.to;
+if(!can("master.edit")){[$("#wFrom"),$("#wTo"),$("#wSave")].forEach(x=>lock(x,false,WHY.edit));}
+$("#wf").onsubmit=e=>{e.preventDefault();if(!can("master.edit"))return;const a=$("#wFrom").value,b=$("#wTo").value,er=$("#wErr");er.textContent="";$("#wFrom").classList.remove("invalid");$("#wTo").classList.remove("invalid");
+ if(!a||!b){er.textContent="Both dates are required.";(a?$("#wTo"):$("#wFrom")).classList.add("invalid");(a?$("#wTo"):$("#wFrom")).focus();return;}
+ if(a>b){er.textContent="The end date must be on or after the start date.";$("#wTo").classList.add("invalid");$("#wTo").focus();return;}
+ const old=store.get("psa_window",{from:"2026-11-01",to:"2026-11-30"});
+ store.set("psa_window",{from:a,to:b});C.audit("Updated","PSA screening window","From "+old.from+" to "+old.to+" → "+a+" to "+b);toast("Screening window saved: "+a+" to "+b);};
+
+/* PSA films */
+function renderP(){const l=allP(),ce=can("master.edit"),cd=can("master.decide"),cx=can("master.delete");const dueN=getP().filter(expired).length;$("#due").textContent=dueN?dueN+" PSA(s) past valid-till and awaiting archival":"No PSAs are awaiting archival";
+ const ar=$("#arch");lock(ar,ce,WHY.edit);const ad=$("#addP");lock(ad,ce,WHY.edit);if(ce)ad.title="Create a PSA film (needs Approver approval)";
+ $("#pRows").innerHTML=l.map(p=>{const e=effS(p);return '<tr><td>'+esc(p.id)+'</td><td><b>'+esc(p.title)+'</b></td><td>'+esc(p.topic)+'</td><td>'+esc(p.validTill)+'</td><td>'+(p.file?esc(p.file):'<span class="muted">-</span>')+'</td><td><span class="chip '+SC[e]+'">'+e+'</span>'+(!p.pending&&expired(p)?' <span class="chip r">Due for archival</span>':'')+'</td><td><div class="acts"><button class="btn sec sm" data-ed="'+esc(p.id)+'"'+dis(ce,WHY.edit)+' aria-label="Edit '+esc(p.title)+'">Edit</button>'+(p.pending?'<button class="btn ok sm" data-pap="'+esc(p.id)+'"'+dis(cd,WHY.decide)+' aria-label="Approve '+esc(p.title)+'">Approve</button>':'')+'<button class="btn bad sm" data-pdel="'+esc(p.id)+'"'+dis(cx,WHY.del)+' aria-label="Delete '+esc(p.title)+'">Delete</button></div></td></tr>';}).join("");}
+$("#addP").onclick=()=>{if(!can("master.edit"))return;pDlg(null);};
+function locate(id){let l=getPend(),x=l.find(p=>p.id===id);if(x)return{l,x,pend:true};l=getP();x=l.find(p=>p.id===id);return x?{l,x,pend:false}:null;}
+function pDlg(id){if(!can("master.edit"))return;const f=id?locate(id):null;if(id&&!f)return;const x=f?f.x:{title:"",topic:TOPICS[0],validTill:"",file:""};
+ mdl('<h2 style="font-size:1.2rem" id="pdT">'+(id?"Edit PSA film "+esc(id):"Create PSA film")+'</h2>'+(!id||(f&&f.pend)?'<div class="muted" style="font-size:.85rem;margin-bottom:6px">This film appears on the public portal only after an Approver approves it.</div>':'')+'<form id="pf" novalidate><label for="pT">Title *</label><input type="text" id="pT" value="'+esc(x.title)+'"><div class="err" id="eT"></div><div class="row2"><div><label for="pTp">Topic *</label><input type="text" id="pTp" list="tpl" value="'+esc(x.topic)+'"><datalist id="tpl">'+TOPICS.map(t=>'<option value="'+t+'">').join("")+'</datalist><div class="err" id="eTp"></div></div><div><label for="pV">Valid till *</label><input type="date" id="pV" value="'+esc(x.validTill)+'"><div class="err" id="eV"></div></div></div><label for="pF">Film file '+(id?"(leave empty to keep "+esc(x.file||"current file")+")":"*")+'</label><input type="file" id="pF" accept="video/*,.mp4,.mov"><div class="err" id="eF"></div><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px"><button type="button" class="btn sec" data-close>Cancel</button><button type="submit" class="btn">Save PSA film</button></div></form>',bg=>{
+  bg.querySelector("#pf").onsubmit=e=>{e.preventDefault();if(!can("master.edit"))return;const g=i=>bg.querySelector(i);const t=g("#pT").value.trim(),tp=g("#pTp").value.trim(),v=g("#pV").value,fl=g("#pF").files[0];let bad=0;
+   const chk=(i,er,m)=>{g(er).textContent=m;g(i).classList.toggle("invalid",!!m);if(m)bad++;};
+   chk("#pT","#eT",t?"":"Title is required.");chk("#pTp","#eTp",tp?"":"Topic is required.");chk("#pV","#eV",v?"":"Valid-till date is required.");
+   chk("#pF","#eF",!id&&!fl?"Please attach the film file.":fl&&fl.size>200*1048576?"File is larger than 200 MB.":"");
+   if(bad){bg.querySelector(".invalid").focus();return;}
+   if(id){const c=locate(id);if(!c)return;const y=c.x,ch=[];if(y.title!==t)ch.push("Title: "+y.title+" → "+t);if(y.topic!==tp)ch.push("Topic: "+y.topic+" → "+tp);if(y.validTill!==v)ch.push("Valid till: "+y.validTill+" → "+v);if(fl)ch.push("File: "+fl.name);
+    Object.assign(y,{title:t,topic:tp,validTill:v});if(fl)y.file=fl.name;if(!c.pend&&y.status==="Archived"&&v>=TODAY)y.status="Active";(c.pend?setPend:setP)(c.l);C.audit("Edited","PSA film "+id+": "+t,(c.pend?"[pending approval] ":"")+(ch.join("; ")||"No field changes"));}
+   else{const n=Math.max(200,...getP().map(p=>num(p.id)),...getPend().map(p=>num(p.id)))+1;const p=getPend();p.unshift({id:"PSA-"+n,title:t,topic:tp,validTill:v,status:"Pending approval",file:fl.name,by:ADG.user().name});setPend(p);C.audit("Created","PSA film PSA-"+n+": "+t,"Submitted for approval");}
+   bg.remove();renderP();toast(id?"PSA film updated":"PSA film created for approval: "+t);};});}
+function approveP(id){if(!can("master.decide"))return;const p=getPend(),x=p.find(q=>q.id===id);if(!x)return;setPend(p.filter(q=>q.id!==id));const rec=Object.assign({},x,{status:"Active"});delete rec.by;const l=getP();l.push(rec);setP(l);C.audit("Approved","PSA film "+x.id+": "+x.title,"Approved for the public portal"+(x.by?"; created by "+x.by:""));renderP();toast("PSA film approved: "+x.title);}
+function delP(id){if(!can("master.delete"))return;const c=locate(id);if(!c)return;
+ C.confirm({title:"Delete PSA film?",ok:"Delete PSA film",cls:"bad",msg:'<b>'+esc(c.x.title)+'</b> ('+esc(id)+') will be permanently removed from the PSA library. This action is recorded in the audit trail.',onOk:()=>{if(!can("master.delete"))return;const c2=locate(id);if(!c2)return;(c2.pend?setPend:setP)(c2.l.filter(p=>p.id!==id));C.audit("Deleted","PSA film "+id+": "+c2.x.title,c2.pend?"Was pending approval":"");renderP();toast("PSA film deleted: "+c2.x.title);}});}
+$("#arch").onclick=()=>{if(!can("master.edit"))return;const l=getP();const ids=[];l.forEach(p=>{if(expired(p)){p.status="Archived";ids.push(p.id);}});setP(l);if(ids.length)C.audit("Archived","PSA films ("+ids.length+")",ids.join(", "));renderP();toast(ids.length?"Archived "+ids.length+" expired PSA"+(ids.length>1?"s":""):"Nothing to archive: no expired PSAs found");};
+
+/* exhibitors */
+const sel=new Set();
+function exhibitors(){const c=store.get("psa_conf",{}),r=store.get("psa_reminders",{});return D.exhibitors.map(e=>{const m=c[e.id];const confirmed=e.status==="Confirmed"||!!m;return Object.assign({},e,{confirmed,status:confirmed?"Confirmed":"Pending",score:Math.min(100,e.score+(m&&e.status!=="Confirmed"?15:0)),rem:r[e.id]||0});});}
+$("#eR").innerHTML+=[...new Set(D.exhibitors.map(e=>e.region))].map(r=>'<option>'+r+'</option>').join("");
+function list(){const q=$("#eQ").value.trim().toLowerCase(),r=$("#eR").value,s=$("#eS").value;return exhibitors().filter(e=>(!r||e.region===r)&&(!s||e.status===s)&&(!q||e.name.toLowerCase().includes(q)));}
+function renderE(){const l=list();$("#eCnt").textContent=l.length+" of "+D.exhibitors.length+" exhibitors";
+ $("#eRows").innerHTML=l.length?l.map(e=>'<tr><td><input type="checkbox" data-sel="'+e.id+'" aria-label="Select '+esc(e.name)+'"'+(sel.has(e.id)?" checked":"")+'></td><td><b>'+esc(e.name)+'</b></td><td>'+esc(e.region)+'</td><td><span class="chip '+(e.confirmed?"g":"o")+'">'+e.status+'</span></td><td><div style="display:flex;gap:8px;align-items:center"><div class="bar" style="flex:1" role="progressbar" aria-label="Score" aria-valuenow="'+e.score+'" aria-valuemin="0" aria-valuemax="100"><i style="width:'+e.score+'%;background:'+(e.score>=85?"var(--green)":e.score>=70?"var(--saffron)":"var(--red)")+'"></i></div><b style="font-size:.85rem">'+e.score+'%</b></div></td><td>'+e.rem+'</td></tr>').join(""):'<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">No exhibitors match these filters.</td></tr>';
+ const vis=l.map(e=>e.id),n=[...sel].length;$("#all").checked=vis.length>0&&vis.every(i=>sel.has(i));$("#remind").textContent="Send reminder ("+n+")";lock($("#remind"),can("master.edit"),WHY.edit);}
+["eR","eS"].forEach(i=>$("#"+i).onchange=renderE);$("#eQ").oninput=renderE;
+$("#all").onchange=e=>{list().forEach(x=>e.target.checked?sel.add(x.id):sel.delete(x.id));renderE();};
+$("#selP").onclick=()=>{sel.clear();exhibitors().filter(e=>!e.confirmed).forEach(e=>sel.add(e.id));renderE();toast(sel.size+" pending exhibitor(s) selected");};
+document.addEventListener("change",ev=>{const c=ev.target.closest("[data-sel]");if(c){c.checked?sel.add(+c.dataset.sel):sel.delete(+c.dataset.sel);renderE();}});
+$("#remind").onclick=()=>{if(!can("master.edit"))return;if(!sel.size){toast("Select at least one exhibitor first.");return;}const r=store.get("psa_reminders",{});const names=exhibitors().filter(e=>sel.has(e.id)).map(e=>e.name);sel.forEach(i=>r[i]=(r[i]||0)+1);store.set("psa_reminders",r);const n=sel.size;sel.clear();C.audit("Reminder sent","PSA exhibitors ("+n+")",names.slice(0,4).join(", ")+(names.length>4?" and "+(names.length-4)+" more":""));renderE();toast("Reminder sent to "+n+" exhibitor"+(n>1?"s":""));};
+document.addEventListener("click",ev=>{const t=ev.target.closest("button");if(!t||t.disabled||t.getAttribute("aria-disabled")==="true")return;const d=t.dataset;
+ if(d.ed){if(can("master.edit"))pDlg(d.ed);}else if(d.pap)approveP(d.pap);else if(d.pdel)delP(d.pdel);});
+
+/* CSV */
+const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+function dl(name,rows){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["﻿"+rows.map(r=>r.map(q).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8"}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),500);}
+$("#exp").onclick=()=>{const l=list();if(!l.length){toast("Nothing to export: no exhibitors match the filters.");return;}dl("exhibitor_compliance_"+TODAY+".csv",[["Exhibitor","Region","Screening","Score (%)","Reminders sent"]].concat(l.map(e=>[e.name,e.region,e.status,e.score,e.rem])));toast("Exported "+l.length+" exhibitors to CSV");};
+$("#expP").onclick=()=>{const l=allP();dl("psa_library_"+TODAY+".csv",[["ID","Title","Topic","Valid till","Status","File"]].concat(l.map(p=>[p.id,p.title,p.topic,p.validTill,effS(p),p.file||""])));toast("Exported "+l.length+" PSA films to CSV");};
+renderP();renderE();
+})();
+</script></body></html>

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Upload video · NaViGate CMS</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<style>
+[hidden]{display:none!important}
+.steps{display:flex;gap:6px;list-style:none;margin:0 0 18px;padding:0;flex-wrap:wrap}
+.steps li{flex:1;min-width:120px;display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:10px;background:var(--soft);border:1px solid var(--line);font-weight:700;font-size:.85rem;color:var(--muted)}
+.steps li .n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--card);border:2px solid var(--line);font-size:.8rem;flex:0 0 26px}
+.steps li.cur{background:var(--card);color:var(--ink);border-color:var(--blue);box-shadow:var(--shadow)}
+.steps li.cur .n{background:var(--navy2);color:#fff;border-color:var(--navy2)}
+.steps li.done{color:var(--green)}
+.steps li.done .n{background:var(--green);color:#fff;border-color:var(--green)}
+.drop{border:2.5px dashed var(--blue);border-radius:14px;padding:38px 20px;text-align:center;background:var(--soft);cursor:pointer;transition:background .15s}
+.drop.over{background:#DCE8F6;border-color:var(--saffron)}
+.drop .big{font-size:2.4rem}
+.file{display:flex;gap:14px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:14px;background:var(--card)}
+.file .ico{font-size:1.8rem}
+.tagbox{display:flex;flex-wrap:wrap;gap:6px;border:1.5px solid var(--line);border-radius:8px;padding:6px;background:var(--card)}
+.tagbox:focus-within{border-color:var(--blue)}
+.tagbox input{border:0!important;outline:0!important;flex:1;min-width:140px;padding:4px 6px!important;width:auto!important}
+.tagbox .chip{display:inline-flex;gap:4px;align-items:center;font-size:.8rem}
+.tagbox .chip button{border:0;background:transparent;cursor:pointer;font-weight:900;color:inherit;padding:0 2px}
+.thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.thumbs label{margin:0;cursor:pointer;font-weight:600;text-align:center;font-size:.78rem}
+.thumbs input{position:absolute;opacity:0}
+.thumbs .th{aspect-ratio:16/9;border-radius:8px;display:grid;place-items:center;color:#fff;font-size:1.6rem;border:3px solid transparent;margin-bottom:4px}
+.thumbs input:checked+.th{border-color:var(--saffron);box-shadow:0 0 0 2px var(--navy2)}
+.thumbs input:focus-visible+.th{outline:3px solid var(--saffron);outline-offset:2px}
+.rend{display:grid;grid-template-columns:70px 1fr 90px;gap:10px;align-items:center;margin:10px 0;font-size:.88rem}
+.rend .bar{height:12px}
+.rend .bar i{transition:width .15s linear}
+.sw{display:flex;align-items:center;gap:10px;font-weight:700}
+.sw input{width:44px;height:24px;appearance:none;background:var(--line);border-radius:99px;position:relative;cursor:pointer;margin:0;transition:background .15s}
+.sw input:before{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.sw input:checked{background:var(--green)}.sw input:checked:before{left:23px}
+.rv{display:grid;grid-template-columns:150px 1fr;gap:8px 16px;margin:0}
+.rv dt{color:var(--muted);font-weight:700;font-size:.85rem}.rv dd{margin:0;word-break:break-word}
+.nav2{display:flex;justify-content:space-between;gap:10px;margin-top:22px;border-top:1px solid var(--line);padding-top:16px}
+.ok-box{text-align:center;padding:26px 10px}
+.ok-box .tick{width:70px;height:70px;border-radius:50%;background:var(--green);color:#fff;font-size:2.2rem;display:grid;place-items:center;margin:0 auto 12px}
+@media(max-width:600px){.thumbs{grid-template-columns:repeat(2,1fr)}.rv{grid-template-columns:1fr}.steps li{min-width:calc(50% - 6px)}.rend{grid-template-columns:56px 1fr 70px}}
+</style></head>
+<body>
+<div id="top"></div>
+<div id="roleNote" style="margin-bottom:16px"></div>
+<ol class="steps" id="steps" aria-label="Upload progress"></ol>
+<section class="card" id="panel" aria-live="polite"></section>
+<script src="../assets/js/data.js"></script><script src="../assets/js/app.js"></script><script src="core-lib.js"></script>
+<script>
+document.getElementById("top").innerHTML=ADG.topbar("Upload video","No-code upload wizard: select, describe, convert, submit for approval");
+ADG.admin({active:"upload"});
+(function(){
+  const A=ADG,C=CORE,D=A.D,$=A.$,esc=A.esc;
+  const NAMES=["Select file","Details","Processing","Review and submit"];
+  const EXT=/\.(mp4|mov|mkv|webm|avi|m4v)$/i, MAXB=2*1024*1024*1024;
+  const THUMB=[["Auto frame 1 (00:03)","🎬"],["Auto frame 2 (25%)","🎞️"],["Auto frame 3 (50%)","📽️"],["Branded title card","🏛️"]];
+  const REND=[["1080p",1,0.9],["720p",.55,1.15],["480p",.3,1.5],["360p",.18,1.9]];
+  let step=1,max=1,tags=[],iv=null,done=false;
+  const S={file:null,dur:"",title:"",desc:"",cat:D.cats[0].id,lang:D.langs[0],thumb:0,captions:true,prog:[0,0,0,0],cap:0,proc:false,rights:false};
+
+  function stepper(){
+    $("#steps").innerHTML=NAMES.map((n,i)=>{ const k=i+1,cls=(done||k<step)?"done":(k===step?"cur":"");
+      return '<li class="'+cls+'"'+(k===step&&!done?' aria-current="step"':'')+'><span class="n">'+((done||k<step)?"✓":k)+'</span><span>'+n+'</span></li>'; }).join("");
+  }
+  function err(id,t){ const e=$("#"+id+"-e"),i=$("#"+id); if(e) e.textContent=t||""; if(i){ i.classList.toggle("invalid",!!t); i.setAttribute("aria-invalid",t?"true":"false"); } return !t; }
+  function nav(){ return '<div class="nav2"><button class="btn sec" id="bk" '+(step===1?'disabled':'')+'>Back</button><button class="btn" id="nx">'+(step===4?'Submit for approval':'Next')+'</button></div>'; }
+
+  function v1(){
+    $("#panel").innerHTML='<h2 style="font-size:1.2rem">Step 1: Select file</h2><p class="muted" style="margin-top:0">MP4, MOV, MKV or WebM, up to 2 GB. The file stays on your device in this demo.</p>'+
+     '<div class="drop" id="drop" tabindex="0" role="button" aria-label="Drop a video here or press Enter to browse"><div class="big" aria-hidden="true">⬆️</div><b>Drag and drop a video here</b><div class="muted">or</div><label for="ff" class="btn" style="display:inline-block;margin:6px 0 0">Browse files</label><input type="file" id="ff" accept="video/*,.mp4,.mov,.mkv,.webm" class="sr-only"></div>'+
+     '<div class="ferr" id="ff-e" role="alert"></div><div id="fi"></div>'+nav();
+    const drop=$("#drop"),ff=$("#ff");
+    drop.onclick=e=>{ if(e.target.tagName!=="LABEL"&&e.target!==ff) ff.click(); };
+    drop.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); ff.click(); } };
+    ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add("over"); }));
+    ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove("over"); }));
+    drop.addEventListener("drop",e=>{ const f=e.dataTransfer&&e.dataTransfer.files[0]; if(f) take(f); });
+    ff.onchange=()=>{ if(ff.files[0]) take(ff.files[0]); };
+    showFile(); wire();
+  }
+  function take(f){
+    if(!(f.type.indexOf("video/")===0||EXT.test(f.name))){ S.file=null; showFile(); $("#ff-e").textContent="\""+f.name+"\" is not a supported video file. Choose MP4, MOV, MKV or WebM."; return; }
+    if(f.size>MAXB){ S.file=null; showFile(); $("#ff-e").textContent="File is "+C.bytes(f.size)+". The limit is 2 GB."; return; }
+    if(f.size===0){ $("#ff-e").textContent="The file is empty."; return; }
+    S.file={name:f.name,size:f.size,type:f.type||"video"}; S.dur=""; $("#ff-e").textContent="";
+    if(!S.title) S.title=f.name.replace(/\.[^.]+$/,"").replace(/[_-]+/g," ");
+    try{ const vd=document.createElement("video"),url=URL.createObjectURL(f); vd.preload="metadata"; vd.onloadedmetadata=()=>{ const d=Math.round(vd.duration||0); if(d>0){ S.dur=("0"+Math.floor(d/60)).slice(-2)+":"+("0"+d%60).slice(-2); showFile(); } URL.revokeObjectURL(url); }; vd.onerror=()=>URL.revokeObjectURL(url); vd.src=url; }catch(e){}
+    showFile();
+  }
+  function showFile(){ const fi=$("#fi"); if(!fi) return; if(!S.file){ fi.innerHTML=""; return; }
+    fi.innerHTML='<div class="file"><span class="ico" aria-hidden="true">🎥</span><div style="flex:1;min-width:0"><b style="word-break:break-all">'+esc(S.file.name)+'</b><div class="muted" style="font-size:.85rem">'+C.bytes(S.file.size)+' · '+esc(S.file.type)+(S.dur?' · '+S.dur:'')+'</div></div><button class="btn sec sm" id="rmf">Remove</button></div>';
+    $("#rmf").onclick=()=>{ S.file=null; S.dur=""; S.proc=false; S.prog=[0,0,0,0]; S.cap=0; showFile(); }; }
+
+  function v2(){
+    $("#panel").innerHTML='<h2 style="font-size:1.2rem">Step 2: Details</h2>'+
+     '<div class="grid g2"><div><label for="ti">Title *</label><input type="text" id="ti" maxlength="120" aria-describedby="ti-e" value="'+esc(S.title)+'"><div class="ferr" id="ti-e" role="alert"></div></div>'+
+     '<div><label for="ca">Category *</label><select id="ca">'+D.cats.map(c=>'<option value="'+c.id+'"'+(c.id===S.cat?' selected':'')+'>'+c.icon+' '+esc(c.name)+'</option>').join("")+'</select></div></div>'+
+     '<label for="ds">Description *</label><textarea id="ds" rows="4" maxlength="500" aria-describedby="ds-e ds-c">'+esc(S.desc)+'</textarea><div style="display:flex;justify-content:space-between"><div class="ferr" id="ds-e" role="alert"></div><div class="muted" id="ds-c" style="font-size:.78rem">0/500</div></div>'+
+     '<div class="grid g2"><div><label for="lg">Language *</label><select id="lg">'+D.langs.map(l=>'<option'+(l===S.lang?' selected':'')+'>'+l+'</option>').join("")+'</select></div>'+
+     '<div><label for="tg">Tags (press Enter or comma to add)</label><div class="tagbox" id="tb"><span id="chips"></span><input type="text" id="tg" placeholder="Add a tag" aria-describedby="tg-e"></div><div class="ferr" id="tg-e" role="alert"></div></div></div>'+
+     '<fieldset style="border:0;padding:0;margin:14px 0 0"><legend style="font-weight:700;font-size:.85rem;padding:0;margin-bottom:6px">Thumbnail</legend><div class="thumbs">'+THUMB.map((t,i)=>'<label><input type="radio" name="th" value="'+i+'"'+(S.thumb===i?' checked':'')+'><div class="th" style="background:linear-gradient(135deg,'+catColor()+',#0B1F3A)" aria-hidden="true">'+t[1]+'</div>'+t[0]+'</label>').join("")+'</div></fieldset>'+nav();
+    const cnt=()=>{ $("#ds-c").textContent=$("#ds").value.length+"/500"; }; cnt(); $("#ds").oninput=cnt;
+    $("#ca").onchange=()=>{ S.cat=$("#ca").value; document.querySelectorAll(".th").forEach(t=>t.style.background="linear-gradient(135deg,"+catColor()+",#0B1F3A)"); };
+    chips();
+    const tg=$("#tg");
+    function add(raw){ const t=raw.trim().toLowerCase().replace(/[^\w\- ]/g,""); if(!t) return; if(t.length>24){ $("#tg-e").textContent="Tags can be up to 24 characters."; return; } if(tags.indexOf(t)>-1){ $("#tg-e").textContent="Tag \""+t+"\" is already added."; return; } if(tags.length>=8){ $("#tg-e").textContent="Maximum 8 tags."; return; } tags.push(t); $("#tg-e").textContent=""; chips(); }
+    tg.onkeydown=e=>{ if(e.key==="Enter"||e.key===","){ e.preventDefault(); add(tg.value); tg.value=""; } else if(e.key==="Backspace"&&!tg.value&&tags.length){ tags.pop(); chips(); } };
+    tg.onblur=()=>{ if(tg.value.trim()){ add(tg.value); tg.value=""; } };
+    wire();
+  }
+  function catColor(){ return C.catOf(S.cat).color; }
+  function chips(){ const c=$("#chips"); if(!c) return; c.innerHTML=tags.map((t,i)=>'<span class="chip b">'+esc(t)+' <button type="button" data-i="'+i+'" aria-label="Remove tag '+esc(t)+'">×</button></span>').join(" ");
+    c.querySelectorAll("button").forEach(b=>b.onclick=()=>{ tags.splice(+b.dataset.i,1); chips(); $("#tg").focus(); }); }
+
+  function v3(){
+    $("#panel").innerHTML='<h2 style="font-size:1.2rem">Step 3: Processing</h2><p class="muted" style="margin-top:0">The media converter creates adaptive-bitrate renditions for smooth playback on any connection (simulated).</p>'+
+     '<div id="rends"></div><div class="rend"><b>Captions</b><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="cb"><i style="width:0"></i></div><span id="cs"></span></div>'+
+     '<label class="sw" style="margin-top:14px"><input type="checkbox" id="cap" role="switch"'+(S.captions?' checked':'')+'> Auto-generated captions</label><div class="muted" style="font-size:.8rem;margin-top:2px">Speech-to-text in '+esc(S.lang)+', editable after approval. Improves accessibility (WCAG 2.1 AA).</div>'+
+     '<div id="pst" class="note" style="margin-top:16px" role="status"></div>'+nav();
+    $("#rends").innerHTML=REND.map((r,i)=>'<div class="rend"><b>'+r[0]+'</b><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="'+r[0]+' conversion" id="rb'+i+'"><i style="width:0"></i></div><span id="rs'+i+'" class="muted"></span></div>').join("");
+    $("#cap").onchange=()=>{ S.captions=$("#cap").checked; if(S.captions&&S.cap<100&&!iv) start(); paint(); };
+    paint(); wire();
+    if(!S.proc) start();
+  }
+  function start(){
+    S.proc=true; clearInterval(iv);
+    iv=setInterval(()=>{
+      let all=true;
+      REND.forEach((r,i)=>{ if(S.prog[i]<100){ S.prog[i]=Math.min(100,S.prog[i]+r[2]*(4+Math.random()*5)); } if(S.prog[i]<100) all=false; });
+      if(S.captions&&S.cap<100){ S.cap=Math.min(100,S.cap+3+Math.random()*3); all=false; }
+      paint();
+      if(all){ clearInterval(iv); iv=null; paint(); }
+    },180);
+  }
+  function complete(){ return S.prog.every(p=>p>=100)&&(!S.captions||S.cap>=100); }
+  function paint(){
+    if(step!==3) return;
+    REND.forEach((r,i)=>{ const p=Math.round(S.prog[i]),b=$("#rb"+i); if(!b) return; b.firstElementChild.style.width=p+"%"; b.setAttribute("aria-valuenow",p); $("#rs"+i).textContent=p>=100?"Done · "+C.bytes(S.file.size*r[1]):p+"%"; });
+    const cb=$("#cb"); if(!cb) return; const cp=Math.round(S.cap); cb.firstElementChild.style.width=(S.captions?cp:0)+"%"; cb.setAttribute("aria-valuenow",S.captions?cp:0);
+    $("#cs").textContent=!S.captions?"Skipped":cp>=100?"Done":cp+"%";
+    const ok=complete(); $("#pst").textContent=ok?"All renditions ready. You can continue to review.":"Converting... please wait. Next unlocks when all renditions are ready.";
+    const nx=$("#nx"); if(nx){ nx.disabled=!ok; }
+  }
+
+  function v4(){
+    const c=C.catOf(S.cat);
+    $("#panel").innerHTML='<h2 style="font-size:1.2rem">Step 4: Review and submit for approval</h2>'+
+     '<dl class="rv"><dt>File</dt><dd>'+esc(S.file.name)+' ('+C.bytes(S.file.size)+(S.dur?', '+S.dur:'')+')</dd><dt>Title</dt><dd><b>'+esc(S.title)+'</b></dd><dt>Description</dt><dd>'+esc(S.desc)+'</dd><dt>Category</dt><dd>'+c.icon+' '+esc(c.name)+'</dd><dt>Language</dt><dd>'+esc(S.lang)+'</dd><dt>Tags</dt><dd>'+(tags.length?tags.map(t=>'<span class="chip b">'+esc(t)+'</span>').join(" "):'<span class="muted">None</span>')+'</dd><dt>Thumbnail</dt><dd>'+THUMB[S.thumb][0]+'</dd><dt>Renditions</dt><dd>1080p, 720p, 480p, 360p (adaptive)</dd><dt>Captions</dt><dd>'+(S.captions?'Auto-generated ('+esc(S.lang)+')':'Not generated')+'</dd></dl>'+
+     '<div class="note" style="margin-top:14px">This video will be saved as <b>Pending approval</b>. An Approver must approve it before it can be published.</div>'+
+     '<label class="chk"><input type="checkbox" id="rt"'+(S.rights?' checked':'')+'> I confirm this content is authorised for publication.</label><div class="ferr" id="rt-e" role="alert"></div>'+nav();
+    $("#rt").onchange=()=>{ S.rights=$("#rt").checked; if(S.rights) $("#rt-e").textContent=""; };
+    wire();
+  }
+  function ok(it){
+    clearInterval(iv); done=true; stepper();
+    $("#panel").innerHTML='<div class="ok-box"><div class="tick" aria-hidden="true">✓</div><h2>Submitted for approval</h2><p><b>'+esc(it.title)+'</b> ('+it.id+') is now <span class="chip o">Pending approval</span>.</p><p class="muted">An Approver will review it. You can follow its status on the approvals board.</p><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px"><a class="btn" href="approvals.html">Go to approvals</a><a class="btn sec" href="library.html">Content library</a><button class="btn sec" id="again">Upload another</button></div></div>';
+    $("#again").onclick=()=>{ Object.assign(S,{file:null,dur:"",title:"",desc:"",cat:D.cats[0].id,lang:D.langs[0],thumb:0,captions:true,prog:[0,0,0,0],cap:0,proc:false,rights:false}); tags=[]; step=1; max=1; done=false; render(); };
+  }
+
+  function validate(k){
+    if(k===1){ if(!S.file){ $("#ff-e").textContent="Select a video file to continue."; return false; } return true; }
+    if(k===2){
+      S.title=$("#ti").value.trim(); S.desc=$("#ds").value.trim(); S.cat=$("#ca").value; S.lang=$("#lg").value;
+      const th=document.querySelector("input[name=th]:checked"); S.thumb=th?+th.value:0;
+      const t=$("#tg"); if(t&&t.value.trim()){ const v=t.value.trim().toLowerCase().replace(/[^\w\- ]/g,""); if(v&&tags.indexOf(v)<0&&tags.length<8) tags.push(v); t.value=""; chips(); }
+      let good=true;
+      good=err("ti",S.title.length<5?(S.title?"Title must be at least 5 characters.":"Title is required."):"")&&good;
+      good=err("ds",S.desc.length<10?(S.desc?"Description must be at least 10 characters.":"Description is required."):"")&&good;
+      if(!good){ const f=document.querySelector(".invalid"); if(f) f.focus(); }
+      return good;
+    }
+    if(k===3){ return complete(); }
+    if(k===4){ if(!S.rights){ $("#rt-e").textContent="Please confirm the content is authorised."; $("#rt").focus(); return false; } return true; }
+  }
+  function submit(){
+    if(!A.can("content.create")||!A.can("content.submit")) return;
+    const u=C.user(), id="U-"+(1000+Math.floor(Math.random()*9000)), c=C.catOf(S.cat);
+    const it={id:id,title:S.title,desc:S.desc,cat:S.cat,lang:S.lang,tags:tags.slice(),thumb:S.thumb,fileName:S.file.name,size:S.file.size,dur:S.dur||"03:30",captions:S.captions,status:"Pending approval",by:u.name,date:C.isoDate(),comment:""};
+    const l=C.uploads(); l.unshift(it); A.store.set("uploads",l);
+    C.audit("Submitted for approval",it.title);
+    ok(it);
+  }
+  function wire(){
+    const bk=$("#bk"),nx=$("#nx");
+    bk.onclick=()=>{ if(step===3){ clearInterval(iv); iv=null; S.proc=false; S.prog=[0,0,0,0]; S.cap=0; } snapshot(); step--; render(); };
+    nx.onclick=()=>{ if(!validate(step)) return; if(step===4){ submit(); return; } snapshot(); step++; max=Math.max(max,step); render(); };
+    if(step===3) paint();
+  }
+  function snapshot(){ if(step===2){ S.title=($("#ti")||{value:S.title}).value; S.desc=($("#ds")||{value:S.desc}).value; } }
+  function render(){ stepper(); [v1,v2,v3,v4][step-1](); const h=$("#panel h2"); if(h){ h.tabIndex=-1; } }
+  function blocked(){
+    $("#steps").hidden=true;
+    $("#panel").innerHTML='<div class="ok-box"><div class="tick" style="background:var(--muted)" aria-hidden="true">!</div><h2>Upload is not available for your role</h2><p>Only the <b>Inputter</b> role can upload videos and submit them for approval. You are signed in as <b>'+esc(A.role()||"Guest")+'</b>.</p><p class="muted">This keeps creation and approval separate. You can still browse the content library.</p><div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px"><a class="btn" href="library.html">Go to the content library</a><a class="btn sec" href="dashboard.html">Back to dashboard</a></div></div>';
+  }
+  const BAN=A.can("content.create")?"<b>Inputter.</b> You can upload videos and submit them for approval, attributed to you. You cannot approve, publish or delete.":"<b>"+esc(A.role()||"Guest")+".</b> Upload is restricted to the Inputter role, so you cannot upload or submit content here.";
+  $("#roleNote").innerHTML='<div class="note" role="note">'+BAN+'</div>';
+  if(!A.can("content.create")) blocked(); else render();
+})();
+</script>
+</body></html>
